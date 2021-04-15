@@ -241,10 +241,11 @@ class UnlinkedOption(Option):
         pass
 
 class DependentOption(UnlinkedOption):
-    def __init__(self, name, value=None, references=None, **kwargs):
+    def __init__(self, name, value=None, references=None, pass_section=False, **kwargs):
         super().__init__(name, **kwargs)
         self._func = value or (lambda *args: None)
         self._refs = references or []
+        self._pass_sec = pass_section
         if isinstance(self._refs, tuple):
             self._refs = list(self._refs)
         elif not isinstance(self._refs, list):
@@ -271,7 +272,11 @@ class DependentOption(UnlinkedOption):
             refs[i] = tuple(reference)
 
     def value(self):
-        return self._func(*(self.sec.cfg[ref[0] or self.sec.name][ref[1]] for ref in self._refs))
+        args = (self.sec.cfg[ref[0] or self.sec.name][ref[1]] for ref in self._refs)
+        if self._pass_sec:
+            return self._func(self.sec, *args)
+        else:
+            return self._func(*args)
 
 class OptionCollection:
     def __init__(self, option_cls, *args, **kwargs):
