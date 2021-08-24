@@ -193,14 +193,16 @@ class Section:
 class Option:
     REFERENCE = object()
     __dtype__ = str
-    __fallback__ = _UNSET
+    __empty__ = ('', 'none', 'null'), None
+    __optional__ = False
 
     def __init__(self, name, **kwargs):
         self.name = name
         self.sec:Section = None
 
         self.dtype = kwargs.get('dtype', self.__dtype__)
-        self.fallback = kwargs.get('fallback', self.__fallback__)
+        self.empty = kwargs.get('empty', self.__empty__)
+        self.optional = kwargs.get('optional', self.__optional__)
         if 'value' in kwargs: self._initial_val = kwargs['value']
 
     def set(self, value):
@@ -217,11 +219,18 @@ class Option:
 
     def _parse(self, parser:ConfigParser, section):
         """ Read the option value from the config file """
-        self.raw = parser.get(section, self.name, fallback=self.fallback)
+        try:
+            self.raw = parser.get(section, self.name)
+        except NoOptionError as e:
+            if self.optional:
+                self.value = self.empty[1]
+                return
+            else:
+                raise e from None
         self.value = self.raw.replace('\n', ' ').strip()
 
-        if self.value.lower() in ('none', 'null', ''):
-            self.value = None
+        if self.value.lower() in self.empty[0]:
+            self.value = self.empty[1]
         else:
             self.value = self.from_str(self.value)
 

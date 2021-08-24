@@ -35,6 +35,8 @@ class BoolOption(Option):
         return string.lower() in self.true_values
 
 class ListOption(Option):
+    __empty__ = ('', '[]'), list()
+
     def __init__(self, name, delimiter=', ', force_dtype=True, **kwargs):
         super().__init__(name, **kwargs)
         self.delimiter = delimiter
@@ -62,6 +64,8 @@ class ListOption(Option):
         return True
 
 class TupleOption(ListOption):
+    __empty__ = ('', '()'), tuple()
+
     def set(self, value):
         self.value = tuple(value)
 
@@ -69,6 +73,8 @@ class TupleOption(ListOption):
         return tuple(super().from_str(string))
 
 class SetOption(ListOption):
+    __empty__ = ('', '{}'), set()
+
     def set(self, value):
         self.value = set(value)
 
@@ -101,7 +107,7 @@ class RangeOption(Option):
         self.stop = float(stop.strip())
         return Option
 
-    def to_str(self):
+    def to_str(self, value):
         return str(self.start) + self.delimiter + str(self.stop)
 
     @property
@@ -157,6 +163,7 @@ class PickleOption(Option):
 
 class JSONOption(Option):
     __dtype__ = None
+    __empty__ = ('', '{}'), dict()
 
     def from_str(self, string:str):
         return json.loads(string)
