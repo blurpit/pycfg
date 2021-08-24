@@ -1,6 +1,6 @@
 import codecs
 from abc import abstractmethod
-from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError
+from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError, _UNSET
 
 
 class ConfigFile:
@@ -193,19 +193,20 @@ class Section:
 class Option:
     REFERENCE = object()
     __dtype__ = str
+    __fallback__ = _UNSET
 
     def __init__(self, name, **kwargs):
         self.name = name
         self.sec:Section = None
 
         self.dtype = kwargs.get('dtype', self.__dtype__)
+        self.fallback = kwargs.get('fallback', self.__fallback__)
         if 'value' in kwargs: self._initial_val = kwargs['value']
 
     def set(self, value):
         self.value = value
 
     def from_str(self, string:str):
-        """  """
         return self.dtype(string)
 
     def to_str(self, value):
@@ -216,7 +217,7 @@ class Option:
 
     def _parse(self, parser:ConfigParser, section):
         """ Read the option value from the config file """
-        self.raw = parser.get(section, self.name)
+        self.raw = parser.get(section, self.name, fallback=self.fallback)
         self.value = self.raw.replace('\n', ' ').strip()
 
         if self.value.lower() in ('none', 'null', ''):
@@ -305,7 +306,7 @@ class SectionCollection:
             if not isinstance(option_cls, (type, OptionCollection)):
                 raise TypeError("Class or OptionCollection expected for SectionCollection.Option type, got %s." % option_cls)
             if not (isinstance(option_cls, OptionCollection) or issubclass(option_cls, Option) or issubclass(option_cls, OptionCollection)):
-                raise TypeError("SectionCollection.Option type %s does not inherit from Option." % option_cls)
+                raise TypeError("SectionCollection.Option type %s does not inherit from Option or OptionCollection." % option_cls)
             self._cls = option_cls
             self._args = args
             self._kwargs = kwargs
