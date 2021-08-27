@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="pycfg",
-    version="1.0.6",
+    version="1.0.7",
     author="David Schneider",
     description="Custom package for working with cfg files easier",
     url="https://github.com/blurpit/pycfg",
