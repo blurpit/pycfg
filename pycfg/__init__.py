@@ -41,6 +41,8 @@ class ConfigFile:
 
         if isinstance(self.file, str):
             self.file = codecs.open(self.file, encoding=self.encoding)
+        elif self.file.closed:
+            self.file = open(self.file.name, mode=self.file.mode, encoding=self.encoding)
         self.parser.read_file(self.file)
         self.file.close()
 
