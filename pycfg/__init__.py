@@ -1,6 +1,7 @@
 import codecs
 from abc import abstractmethod
 from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError, _UNSET
+from typing import TextIO, Union
 
 
 class ConfigFile:
@@ -8,8 +9,9 @@ class ConfigFile:
     __immutable__ = False
     __autowrite__ = False
 
-    def __init__(self, filename=None, **kwargs):
-        self.filename = filename
+    def __init__(self, file=None, encoding=None, **kwargs):
+        self.file = file
+        self.encoding = encoding
 
         # Overwrite class options
         self.__immutable__ = kwargs.get('immutable', self.__immutable__)
@@ -17,25 +19,31 @@ class ConfigFile:
 
         self.parser:ConfigParser = None
         self._sections = {}
-        if self.filename:
+        if self.file:
             self.read()
 
-    def read(self, filename:str=None, encoding=None):
+    def read(self, file=None, encoding=None):
         """
         Read config file.
 
-        :param filename: Filepath to read, if not already given in the constructor.
-        :param encoding: File encoding. Default is 'utf8'
+        :param file: File-like object or a file path to read, if not already given in the constructor.
+        :param encoding: File encoding. Default is platform-specific
         """
-        if filename:
-            self.filename = filename
-        if not self.filename:
+        if file:
+            self.file = file
+        if encoding:
+            self.encoding = encoding
+        if not self.file:
             raise FileNotFoundError("No file was given.")
 
         self.parser = ConfigParser()
         self.parser.optionxform = str
 
-        self.parser.read_file(codecs.open(self.filename, encoding=encoding))
+        if isinstance(self.file, str):
+            self.file = codecs.open(self.file, encoding=self.encoding)
+        self.parser.read_file(self.file)
+        self.file.close()
+
         self.create()
         for section in self:
             section._parse(self.parser)
@@ -85,7 +93,7 @@ class ConfigFile:
     def write(self):
         """ Writes changes to the config parser to the file. """
         if not self.__immutable__:
-            with open(self.filename, 'w', encoding='utf8') as file:
+            with open(self.file.name, 'w', encoding=self.encoding) as file:
                 self.parser.write(file)
 
     def __len__(self):
@@ -107,7 +115,7 @@ class ConfigFile:
         raise NotImplementedError('PyCfgFile needs to implement the create() method.')
 
     def __str__(self):
-        return "<%s at %s>" % (self.__class__.__name__, self.filename or '(unknown)')
+        return "<%s at %s>" % (self.__class__.__name__, self.file.name or '(unknown)')
 
 
 class Section:
