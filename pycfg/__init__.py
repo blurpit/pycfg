@@ -44,6 +44,7 @@ class ConfigFile:
         self.parser.read_file(self.file)
         self.file.close()
 
+        self._sections = {}
         self.create()
         for section in self:
             section._parse(self.parser)
