@@ -42,7 +42,7 @@ class ConfigFile:
         if isinstance(self.file, str):
             self.file = codecs.open(
                 self.file,
-                mode='r' if self.__immutable__ else 'w+',
+                mode='r' if self.__immutable__ else 'r+',
                 encoding=self.encoding
             )
         elif self.file.closed:
