@@ -46,7 +46,11 @@ class ConfigFile:
                 encoding=self.encoding
             )
         elif self.file.closed:
-            self.file = open(self.file.name, mode=self.file.mode, encoding=self.encoding)
+            self.file = codecs.open(
+                self.file.name,
+                mode='r' if self.__immutable__ else 'r+',
+                encoding=self.encoding
+            )
         self.parser.read_file(self.file)
         self.file.close()
 
