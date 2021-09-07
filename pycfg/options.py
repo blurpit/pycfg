@@ -3,6 +3,7 @@ import datetime as dt
 import decimal
 import json
 import pickle
+import re
 from typing import Sequence, Collection
 
 from . import Option
@@ -48,7 +49,10 @@ class ListOption(Option):
     def from_str(self, string):
         if not string:
             return []
-        result = string.split(self.delimiter)
+        if isinstance(self.delimiter, re.Pattern):
+            result = self.delimiter.split(string)
+        else:
+            result = string.split(self.delimiter)
         if self.dtype != str:
             result = list(map(self.dtype, result))
         return result

@@ -1,7 +1,6 @@
 import codecs
 from abc import abstractmethod
-from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError, _UNSET
-from typing import TextIO, Union
+from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError
 
 
 class ConfigFile:
