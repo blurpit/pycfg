@@ -38,10 +38,11 @@ class BoolOption(Option):
 class ListOption(Option):
     __empty__ = ('', '[]'), list()
 
-    def __init__(self, name, delimiter=', ', force_dtype=True, **kwargs):
+    def __init__(self, name, delimiter=', ', force_dtype=True, sort=None, **kwargs):
         super().__init__(name, **kwargs)
         self.delimiter = delimiter
         self._force_dtype = force_dtype
+        self._sort = sort
 
     def set(self, value):
         self.value = list(value)
@@ -55,6 +56,8 @@ class ListOption(Option):
             result = string.split(self.delimiter)
         if self.dtype != str:
             result = list(map(self.dtype, result))
+        if self._sort:
+            result.sort(key=self._sort if callable(self._sort) else None)
         return result
 
     def to_str(self, value):
