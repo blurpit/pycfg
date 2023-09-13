@@ -1,27 +1,23 @@
 import codecs
 from abc import abstractmethod
-from configparser import ConfigParser, NoSectionError, NoOptionError, DuplicateSectionError, DuplicateOptionError
+from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
+from typing import Any, Optional, TextIO, Union
 
 
 class ConfigFile:
     """ Base class for config objects """
     __immutable__ = False
-    __autowrite__ = False
 
-    def __init__(self, file=None, encoding=None, **kwargs):
+    def __init__(self, file:Union[TextIO, str, None], encoding:Optional[str]=None):
         self.file = file
         self.encoding = encoding
 
-        # Overwrite class options
-        self.__immutable__ = kwargs.get('immutable', self.__immutable__)
-        self.__autowrite__ = kwargs.get('autowrite', self.__autowrite__)
-
-        self.parser:ConfigParser = None
+        self.parser:Optional[ConfigParser] = None
         self._sections = {}
         if self.file:
             self.read()
 
-    def read(self, file=None, encoding=None):
+    def read(self, file:Union[TextIO, str, None]=None, encoding:Optional[str]=None):
         """
         Read config file.
 
@@ -33,7 +29,7 @@ class ConfigFile:
         if encoding:
             self.encoding = encoding
         if not self.file:
-            raise FileNotFoundError("No file was given.")
+            raise FileNotFoundError('No file was given.')
 
         self.parser = ConfigParser()
         self.parser.optionxform = str
@@ -58,28 +54,28 @@ class ConfigFile:
         for section in self:
             section._parse(self.parser)
 
-    def register(self, section):
+    def register(self, section:'Section'):
         if section in self:
-            raise DuplicateSectionError(section)
+            raise DuplicateSectionError(section.name)
         section.cfg = self
         self._sections[section.name] = section
 
-    def create_section(self, name, *options):
-        self.parser.add_section(name)
-        Section(self, name, *options)
+    def create_section(self, section_name:str, *options:'Option'):
+        self.parser.add_section(section_name)
+        Section(self, section_name, *options)
 
-    def remove_section(self, section):
-        if section not in self:
-            raise NoSectionError(section)
-        self.parser.remove_section(section)
-        self._sections.pop(section)
+    def remove_section(self, section_name:str):
+        if section_name not in self:
+            raise NoSectionError(section_name)
+        self.parser.remove_section(section_name)
+        self._sections.pop(section_name)
 
     def __getitem__(self, section:str):
         if section not in self:
             raise NoSectionError(section)
         return self._sections[section]
 
-    def set(self, section, option, value):
+    def set(self, section:Union['Section', str], option:Union['Option', str], value:Any):
         if self.__immutable__:
             raise PermissionError("Config file '%s' is immutable." % self.filename)
 
@@ -97,13 +93,11 @@ class ConfigFile:
                 section.name, option.name,
                 option.to_str(value)
             )
-            if self.__autowrite__:
-                self.write()
 
-    def write(self):
+    def save(self):
         """ Writes changes to the config parser to the file. """
         if not self.__immutable__:
-            with open(self.file.name, 'w', encoding=self.encoding) as file:
+            with open(self.filename, 'w', encoding=self.encoding) as file:
                 self.parser.write(file)
 
     def __len__(self):
@@ -112,20 +106,34 @@ class ConfigFile:
     def __iter__(self):
         return iter(self._sections.values())
 
-    @property
-    def section_names(self):
-        return list(self._sections.keys())
-
-    def __contains__(self, section):
-        return section in self._sections
+    def __contains__(self, section:Union['Section', str]):
+        if isinstance(section, Section):
+            return section.cfg is self and section.name in self._sections
+        elif isinstance(section, str):
+            return section in self._sections
+        else:
+            return False
 
     @abstractmethod
     def create(self):
         """ Override this method in a child class to parse config options """
         raise NotImplementedError('PyCfgFile needs to implement the create() method.')
 
+    @property
+    def filename(self):
+        if isinstance(self.file, TextIO):
+            return self.file.name
+        elif isinstance(self.file, str):
+            return self.file
+        else:
+            return '(unknown)'
+
+    @property
+    def section_names(self):
+        return list(self._sections.keys())
+
     def __str__(self):
-        return "<%s at %s>" % (self.__class__.__name__, self.file.name or '(unknown)')
+        return "<%s at %s>" % (type(self).__name__, self.filename)
 
 
 class Section:
