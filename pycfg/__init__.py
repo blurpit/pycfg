@@ -1,7 +1,7 @@
 import codecs
 from abc import abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
-from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Tuple, Type, Union
 
 
 class ConfigFile:
@@ -58,8 +58,8 @@ class ConfigFile:
         if section in self:
             raise DuplicateSectionError(section.name)
 
-        section.cfg = self
-        self._sections[section.name] = section
+        if section.on_register(self):
+            self._sections[section.name] = section
 
     def create_section(self, section_name:str, *options:'Option') -> 'Section':
         self.parser.add_section(section_name)
@@ -157,8 +157,12 @@ class Section:
         if option.name in self:
             raise DuplicateOptionError(self.name, option.name)
 
-        option.section = self
-        self._options[option.name] = option
+        if option.on_register(self):
+            self._options[option.name] = option
+
+    def on_register(self, cfg:ConfigFile) -> bool:
+        self.cfg = cfg
+        return True
 
     def get_ref(self, option_name:str) -> 'Option':
         if option_name not in self:
@@ -204,7 +208,7 @@ class Section:
         for k in self:
             yield self[k]
 
-    def items(self) -> Iterable[Tuple]:
+    def items(self) -> Iterable[Tuple[str, Any]]:
         for k in self:
             yield k, self[k]
 
@@ -223,7 +227,7 @@ class Option:
     __type__ = str
     __empty__ = ('', 'none', 'null'), None
 
-    def __init__(self, name:str, optional:bool=False):
+    def __init__(self, name:str, *, optional:bool=False):
         self.name = name
         self.section:Optional[Section] = None
         self.optional = optional
@@ -244,6 +248,10 @@ class Option:
 
     def to_str(self, value:Any) -> str:
         return str(value)
+
+    def on_register(self, section:Section) -> bool:
+        self.section = section
+        return True
 
     def parse(self, parser:ConfigParser, section_name:str):
         """ Read the option value from the config file """
@@ -275,65 +283,45 @@ class UnlinkedOption(Option):
         # Unlinked options have nothing to read
         pass
 
-# class DependentOption(UnlinkedOption):
-#     def __init__(self, name, value=None, references=None, pass_section=False, **kwargs):
-#         super().__init__(name, **kwargs)
-#         self._func = value or (lambda *args: None)
-#         self._refs = references or []
-#         self._pass_sec = pass_section
-#         if isinstance(self._refs, tuple):
-#             self._refs = list(self._refs)
-#         elif not isinstance(self._refs, list):
-#             self._refs = [self._refs]
-#         self._parse_references(self._refs)
-#
-#     def set(self, value):
-#         raise PermissionError("Cannot set value on dependent option.")
-#
-#     def _parse_references(self, refs):
-#         for i, reference in enumerate(refs):
-#             if isinstance(reference, str):
-#                 reference = reference.split('/')
-#             elif not isinstance(reference, (tuple, list)):
-#                 raise TypeError("Unexpected type for dependent option reference: %s %s, expected: str, tuple, list" % (reference, type(reference)))
-#
-#             if len(reference) == 1:
-#                 reference = (None, reference[0])
-#             if len(reference) > 2 or len(reference) <= 0:
-#                 raise ValueError("Dependent option reference must be 1 or 2 elements in length (section, option), got: %s" % str(reference))
-#             elif not (reference[0] is None or isinstance(reference[0], str) and isinstance(reference[1], str)):
-#                 raise ValueError("Dependent option references must be strings, got: %s" % str(reference))
-#
-#             refs[i] = tuple(reference)
-#
-#     def value(self):
-#         args = (self.sec.cfg[ref[0] or self.sec.name][ref[1]] for ref in self._refs)
-#         if self._pass_sec:
-#             return self._func(self.sec, *args)
-#         else:
-#             return self._func(*args)
-#
-# class OptionCollection:
-#     def __init__(self, option_cls, *args, **kwargs):
-#         if not isinstance(option_cls, type):
-#             raise TypeError("Class expected for OptionCollection type, got '%s'." % option_cls)
-#         if not issubclass(option_cls, Option):
-#             raise TypeError("OptionCollection type %s does not inherit from Option." % option_cls)
-#         self._cls = option_cls
-#         self._filter = kwargs.get('name_filter')
-#         self._limit = kwargs.get('match_limit')
-#         self._args = args
-#         self._kwargs = kwargs
-#
-#     def _register(self, sec):
-#         count = 0
-#         for name in sec.cfg.parser[sec.name]:
-#             if name not in sec \
-#                     and (self._limit is None or count < self._limit) \
-#                     and (not self._filter or self._filter(name)):
-#                 sec.register(self._cls(name, *self._args, **self._kwargs))
-#                 count += 1
-#
+
+class DerivedOption(UnlinkedOption):
+    def __init__(self, name:str, value:Callable[..., Any], references:List[str | Tuple[str, str]]):
+        super().__init__(name)
+        self.value_func = value
+
+        for i, ref in enumerate(references):
+            # If a section wasn't passed, fill in None to be replaced later
+            if isinstance(ref, str):
+                references[i] = (None, ref)
+        self.references = references
+
+    def set(self, _):
+        raise ValueError('Cannot set value on a DerivedOption')
+
+    @property
+    def value(self):
+        return self.value_func(*self._get_args())
+
+    def _get_args(self):
+        for sec_name, opt_name in self.references:
+            if sec_name is None:
+                section = self.section
+            else:
+                section = self.section.cfg[sec_name]
+            yield section[opt_name]
+
+
+class OptionCollection:
+    def __init__(self, option_cls:Type[Option], *args, **kwargs):
+        self.option_cls = option_cls
+        self.args = args
+        self.kwargs = kwargs
+
+    def on_register(self, section:Section):
+        for name in section.cfg.parser[section.name]:
+            if name not in section:
+                section.register(self.option_cls(name, *self.args, **self.kwargs))
+
 # class SectionCollection:
 #     class Option:
 #         def __init__(self, option_cls, *args, **kwargs):
