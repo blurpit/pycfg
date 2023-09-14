@@ -311,8 +311,9 @@ class DerivedOption(UnlinkedOption):
             yield section[opt_name]
 
 
-class OptionCollection:
+class OptionCollection(UnlinkedOption):
     def __init__(self, option_cls:Type[Option], *args, **kwargs):
+        super().__init__('')
         self.option_cls = option_cls
         self.args = args
         self.kwargs = kwargs
