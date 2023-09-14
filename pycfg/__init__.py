@@ -1,7 +1,7 @@
 import codecs
 from abc import abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
-from typing import Any, Optional, TextIO, Union
+from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
 
 class ConfigFile:
@@ -13,7 +13,7 @@ class ConfigFile:
         self.encoding = encoding
 
         self.parser:Optional[ConfigParser] = None
-        self._sections = {}
+        self._sections:Dict[str, Section] = {}
         if self.file:
             self.read()
 
@@ -52,7 +52,7 @@ class ConfigFile:
         self._sections = {}
         self.create()
         for section in self:
-            section._parse(self.parser)
+            section.parse(self.parser)
 
     def register(self, section:'Section'):
         if section in self:
@@ -60,17 +60,17 @@ class ConfigFile:
         section.cfg = self
         self._sections[section.name] = section
 
-    def create_section(self, section_name:str, *options:'Option'):
+    def create_section(self, section_name:str, *options:'Option') -> 'Section':
         self.parser.add_section(section_name)
-        Section(self, section_name, *options)
+        return Section(self, section_name, *options)
 
-    def remove_section(self, section_name:str):
+    def remove_section(self, section_name:str) -> 'Section':
         if section_name not in self:
             raise NoSectionError(section_name)
         self.parser.remove_section(section_name)
-        self._sections.pop(section_name)
+        return self._sections.pop(section_name)
 
-    def __getitem__(self, section:str):
+    def __getitem__(self, section:str) -> 'Section':
         if section not in self:
             raise NoSectionError(section)
         return self._sections[section]
@@ -79,10 +79,17 @@ class ConfigFile:
         if self.__immutable__:
             raise PermissionError("Config file '%s' is immutable." % self.filename)
 
-        if not isinstance(section, Section):
+        # Convert str -> Section and make sure it is in the config
+        if isinstance(section, str):
             section = self[section]
-        if not isinstance(option, Option):
-            option = section.ref(option)
+            if section not in self:
+                raise NoSectionError(section.name)
+
+        # Convert str -> Option and make sure it is in the section
+        if isinstance(option, str):
+            option = section.get_ref(option)
+            if option not in section:
+                raise NoOptionError(option.name, section.name)
 
         if option.typecheck is not None and not option.typecheck(value):
             raise TypeError("Wrong type for option %s: %s, expected: %s." % (option.name, value, option.dtype))
@@ -120,7 +127,7 @@ class ConfigFile:
         raise NotImplementedError('PyCfgFile needs to implement the create() method.')
 
     @property
-    def filename(self):
+    def filename(self) -> str:
         if isinstance(self.file, TextIO):
             return self.file.name
         elif isinstance(self.file, str):
@@ -129,7 +136,7 @@ class ConfigFile:
             return '(unknown)'
 
     @property
-    def section_names(self):
+    def section_names(self) -> List[str]:
         return list(self._sections.keys())
 
     def __str__(self):
@@ -137,22 +144,17 @@ class ConfigFile:
 
 
 class Section:
-    def __init__(self, cfg:ConfigFile, name:str, *options):
-        if not isinstance(name, str):
-            raise TypeError("Section name must be a string.")
-        if len(name) == 0:
-            raise ValueError("Section name cannot be empty.")
+    def __init__(self, cfg:ConfigFile, name:str, *options:'Option'):
         self.cfg = cfg
         self.name = name
 
-        self._options = {}
+        self._options:Dict[str, Option] = {}
         for option in options:
             self.register(option)
 
-        if self.cfg is not None:
-            self.cfg.register(self)
+        self.cfg.register(self)
 
-    def register(self, option):
+    def register(self, option:'Option'):
         if isinstance(option, OptionCollection):
             option._register(self)
             return
@@ -165,24 +167,27 @@ class Section:
             self.set(option, option._initial_val)
             delattr(option, '_initial_val')
 
-    def ref(self, option):
-        if option not in self:
-            raise NoOptionError(option, self.name)
-        return self._options[option]
+    def get_ref(self, option_name:str) -> 'Option':
+        if option_name not in self:
+            raise NoOptionError(option_name, self.name)
+        return self._options[option_name]
 
-    def get(self, option, fallback=None):
-        return self[option] if option in self else fallback
+    def get(self, option_name:str, default:Any=None) -> Any:
+        if option_name in self:
+            return self[option_name]
+        else:
+            return default
 
-    def set(self, option, value):
+    def set(self, option:Union['Option', str], value:Any):
         self.cfg.set(self, option, value)
 
-    def raw(self, option, fallback=None):
-        return self.ref(option).raw if option in self else fallback
+    def get_raw(self, option) -> str:
+        return self.get_ref(option).raw
 
-    def __getitem__(self, option):
-        return self.ref(option).get_value()
+    def __getitem__(self, option_name:str) -> Any:
+        return self.get_ref(option_name).get_value()
 
-    def __setitem__(self, option, value):
+    def __setitem__(self, option:Union['Option', str], value:Any):
         self.set(option, value)
 
     def __len__(self):
@@ -191,23 +196,28 @@ class Section:
     def __iter__(self):
         return iter(self._options)
 
-    def __contains__(self, name):
-        return name in self._options
+    def __contains__(self, option:Union['Option', str]):
+        if isinstance(option, Option):
+            return option.sec is self and option.name in self._options
+        elif isinstance(option, str):
+            return option in self._options
+        else:
+            return False
 
-    def keys(self):
+    def keys(self) -> Iterable[str]:
         return self._options.keys()
 
-    def values(self):
+    def values(self) -> Iterable[Any]:
         for k in self:
             yield self[k]
 
-    def items(self):
+    def items(self) -> Iterable[Tuple]:
         for k in self:
             yield k, self[k]
 
-    def _parse(self, parser:ConfigParser):
+    def parse(self, parser:ConfigParser):
         for option in self._options.values():
-            option._parse(parser, self.name)
+            option.parse(parser, self.name)
 
     def __str__(self):
         return "<Section '%s'>" % self.name
@@ -231,22 +241,22 @@ class Option:
         self.optional = kwargs.get('optional', self.__optional__)
         if 'value' in kwargs: self._initial_val = kwargs['value']
 
-    def set(self, value):
+    def set(self, value:Any):
         self.value = value
 
-    def from_str(self, string:str):
+    def from_str(self, string:str) -> Any:
         return self.dtype(string)
 
-    def to_str(self, value):
+    def to_str(self, value:Any) -> str:
         return str(value)
 
     def typecheck(self, value):
         return self.dtype is None or isinstance(value, self.dtype)
 
-    def _parse(self, parser:ConfigParser, section):
+    def parse(self, parser:ConfigParser, section_name):
         """ Read the option value from the config file """
         try:
-            self.raw = parser.get(section, self.name)
+            self.raw = parser.get(section_name, self.name)
         except NoOptionError as e:
             if self.optional:
                 self.value = self.empty[1]
@@ -272,7 +282,7 @@ class Option:
         return "%s('%s')" % (self.__class__.__name__, self.name)
 
 class UnlinkedOption(Option):
-    def _parse(self, parser, section):
+    def parse(self, parser, section_name):
         # Unlinked, nothing to read
         pass
 
