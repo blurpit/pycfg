@@ -9,7 +9,7 @@ class ConfigFile:
     """ Base class for config objects """
     __immutable__ = False
 
-    def __init__(self, file:Union[TextIO, str, None], encoding:Optional[str]=None):
+    def __init__(self, file:Union[TextIO, str, None]=None, encoding:Optional[str]=None):
         self.file = file
         self.encoding = encoding
 
