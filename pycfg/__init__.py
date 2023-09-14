@@ -1,7 +1,7 @@
 import codecs
 from abc import abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
-from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple, Type, Union
+from typing import Any, Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
 
 class ConfigFile:
@@ -57,6 +57,7 @@ class ConfigFile:
     def register(self, section:'Section'):
         if section in self:
             raise DuplicateSectionError(section.name)
+
         section.cfg = self
         self._sections[section.name] = section
 
@@ -123,7 +124,7 @@ class ConfigFile:
     @abstractmethod
     def create(self):
         """ Override this method in a child class to parse config options """
-        raise NotImplementedError('PyCfgFile needs to implement the create() method.')
+        raise NotImplementedError('ConfigFile classes need to implement the create() method')
 
     @property
     def filename(self) -> str:
@@ -139,28 +140,25 @@ class ConfigFile:
         return list(self._sections.keys())
 
     def __str__(self):
-        return "<%s at %s>" % (type(self).__name__, self.filename)
+        return "<{} at {}>".format(type(self).__name__, self.filename)
 
 
 class Section:
     def __init__(self, cfg:ConfigFile, name:str, *options:'Option'):
         self.cfg = cfg
         self.name = name
-
         self._options:Dict[str, Option] = {}
-        for option in options:
-            self.register(option)
 
         self.cfg.register(self)
+        for option in options:
+            self.register(option)
 
     def register(self, option:'Option'):
         if option.name in self:
             raise DuplicateOptionError(self.name, option.name)
+
         option.section = self
         self._options[option.name] = option
-        if hasattr(option, '_initial_val'):
-            self.set(option, option._initial_val)
-            delattr(option, '_initial_val')
 
     def get_ref(self, option_name:str) -> 'Option':
         if option_name not in self:
@@ -177,10 +175,10 @@ class Section:
         self.cfg.set(self, option, value)
 
     def get_raw(self, option) -> str:
-        return self.get_ref(option).raw
+        return self.get_ref(option).raw_value
 
     def __getitem__(self, option_name:str) -> Any:
-        return self.get_ref(option_name).get_value()
+        return self.get_ref(option_name).value
 
     def __setitem__(self, option:Union['Option', str], value:Any):
         self.set(option, value)
