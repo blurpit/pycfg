@@ -1,6 +1,7 @@
 import codecs
 from abc import abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
+from copy import copy
 from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Tuple, Type, Union
 
 
@@ -323,32 +324,10 @@ class OptionCollection(UnlinkedOption):
             if name not in section:
                 section.register(self.option_cls(name, *self.args, **self.kwargs))
 
-# class SectionCollection:
-#     class Option:
-#         def __init__(self, option_cls, *args, **kwargs):
-#             if not isinstance(option_cls, (type, OptionCollection)):
-#                 raise TypeError("Class or OptionCollection expected for SectionCollection.Option type, got %s." % option_cls)
-#             if not (isinstance(option_cls, OptionCollection) or issubclass(option_cls, Option) or issubclass(option_cls, OptionCollection)):
-#                 raise TypeError("SectionCollection.Option type %s does not inherit from Option or OptionCollection." % option_cls)
-#             self._cls = option_cls
-#             self._args = args
-#             self._kwargs = kwargs
-#
-#         def __call__(self):
-#             if isinstance(self._cls, OptionCollection): return self._cls
-#             return self._cls(*self._args, **self._kwargs)
-#
-#     def __init__(self, cfg:ConfigFile, *options:Option, **kwargs):
-#         self._filter = kwargs.get('name_filter')
-#         self._limit = kwargs.get('match_limit')
-#         self._register(cfg, options)
-#
-#     def _register(self, cfg, options):
-#         count = 0
-#         for name in cfg.parser:
-#             if name != 'DEFAULT' \
-#                     and name not in cfg \
-#                     and (self._limit is None or count < self._limit) \
-#                     and (not self._filter or self._filter(name)):
-#                 Section(cfg, name, *(option() for option in options))
-#                 count += 1
+
+class SectionCollection:
+    def __init__(self, cfg:ConfigFile, *options:Option):
+        for section_name in cfg.parser:
+            if section_name != 'DEFAULT' and section_name not in cfg:
+                opt_copies = (copy(option) for option in options)
+                Section(cfg, section_name, *opt_copies)
