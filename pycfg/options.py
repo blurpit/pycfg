@@ -1,10 +1,11 @@
+import base64
 import codecs
 import datetime as dt
 import decimal
 import json
 import pickle
 import re
-from typing import Sequence, Collection
+from typing import Any, Collection, Type, Union
 
 from . import Option
 
@@ -14,168 +15,126 @@ class StrOption(Option):
 
 class IntOption(Option):
     """ Option with int datatype """
-    __dtype__ = int
+    __type__ = int
 
 class FloatOption(Option):
     """ Option with float datatype """
-    __dtype__ = float
+    __type__ = float
 
 class DecimalOption(Option):
     """ Option with decimal.Decimal datatype """
-    __dtype__ = decimal.Decimal
+    __type__ = decimal.Decimal
 
 class BoolOption(Option):
     """ Option with bool datatype. Values passed into  """
-    __dtype__ = bool
+    __type__ = bool
+    __truthy__ = ('true', 'yes', 'on', 'enabled')
 
-    def __init__(self, name, true_values=('true', 'yes', 'on', 'enabled'), **kwargs):
-        super().__init__(name, **kwargs)
-        self.true_values = true_values
-
-    def from_str(self, string):
-        return string.lower() in self.true_values
+    def from_str(self, string:str):
+        return string.lower() in self.__truthy__
 
 class ListOption(Option):
+    __type__ = list
     __empty__ = ('', '[]'), list()
 
-    def __init__(self, name, delimiter=', ', force_dtype=True, sort=None, **kwargs):
-        super().__init__(name, **kwargs)
+    def __init__(self, name:str, delimiter:Union[str, re.Pattern]=', ', elem_types:Type=str, *, optional:bool=False):
+        super().__init__(name, optional=optional)
+        self.elem_types = elem_types
         self.delimiter = delimiter
-        self._force_dtype = force_dtype
-        self._sort = sort
 
-    def set(self, value):
-        self.value = list(value)
-
-    def from_str(self, string):
+    def from_str(self, string:str):
         if not string:
             return []
+
         if isinstance(self.delimiter, re.Pattern):
             result = self.delimiter.split(string)
         else:
             result = string.split(self.delimiter)
-        if self.dtype != str:
-            result = list(map(self.dtype, result))
-        if self._sort:
-            result.sort(key=self._sort if callable(self._sort) else None)
+
+        if self.elem_types is not str:
+            for i, x in enumerate(result):
+                result[i] = self.elem_types(x)
+
         return result
 
-    def to_str(self, value):
+    def to_str(self, value:Collection):
         return self.delimiter.join(map(str, value))
 
-    def typecheck(self, value):
-        if not isinstance(value, Collection):
-            raise TypeError("Wrong type for option %s: %s, expected typing.Collection" % (self.name, value))
-        elif self._force_dtype:
-            return all(isinstance(element, self.dtype) for element in value)
-        return True
-
 class TupleOption(ListOption):
+    __type__ = tuple
     __empty__ = ('', '()'), tuple()
 
-    def set(self, value):
-        self.value = tuple(value)
-
-    def from_str(self, string):
+    def from_str(self, string:str):
         return tuple(super().from_str(string))
 
 class SetOption(ListOption):
+    __type__ = set
     __empty__ = ('', '{}'), set()
-
-    def set(self, value):
-        self.value = set(value)
 
     def from_str(self, string):
         return set(super().from_str(string))
 
 class RangeOption(Option):
-    __dtype__ = tuple
+    __type__ = range
 
-    def __init__(self, name, delimiter='-', **kwargs):
-        super().__init__(name, dtype=Sequence, reference=True, **kwargs)
+    def __init__(self, name:str, delimiter:str='-', *, optional:bool=False):
+        super().__init__(name, optional=optional)
         self.delimiter = delimiter
-        self.start = 0
-        self.stop = 0
 
-    def set(self, value):
-        """ Set the range. Value must be a tuple of (start, stop) """
-        self.start, self.stop = value
-        self.value = Option.REFERENCE
-
-    def set_start(self, start):
-        self.set((start, self.stop))
-
-    def set_stop(self, stop):
-        self.set((self.start, stop))
-
-    def from_str(self, string):
+    def from_str(self, string:str):
         start, stop = string.split(self.delimiter)
-        self.start = float(start.strip())
-        self.stop = float(stop.strip())
-        return Option
+        return range(int(start), int(stop))
 
-    def to_str(self, value):
-        return str(self.start) + self.delimiter + str(self.stop)
-
-    @property
-    def size(self):
-        return self.stop - self.start
-
-    def __contains__(self, item):
-        return self.start <= item <= self.stop
-
-    def __str__(self):
-        return "RangeOption(%s, %s)" % (self.start, self.stop)
+    def to_str(self, value:range):
+        return str(value.start) + self.delimiter + str(value.stop)
 
 class DateTimeOption(Option):
     ISOFORMAT = object()
-    __dtype__ = dt.datetime
+    __type__ = dt.datetime
 
-    def __init__(self, name, fmt=ISOFORMAT, **kwargs):
-        super().__init__(name, **kwargs)
+    def __init__(self, name:str, fmt:str=ISOFORMAT, *, optional:bool=False):
+        super().__init__(name, optional=optional)
         self.fmt = fmt
 
-    def from_str(self, string):
-        if self.fmt == self.ISOFORMAT:
+    def from_str(self, string:str):
+        if self.fmt is self.ISOFORMAT:
             return dt.datetime.fromisoformat(string)
         else:
             return dt.datetime.strptime(string, self.fmt)
 
     def to_str(self, value:dt.datetime):
-        if self.fmt == self.ISOFORMAT:
+        if self.fmt is self.ISOFORMAT:
             return value.isoformat()
         else:
             return value.strftime(self.fmt)
 
 class DateOption(DateTimeOption):
-    ISOFORMAT = "%Y-%m-%d"
-    __dtype__ = dt.date
+    __type__ = dt.date
 
-    def from_str(self, string):
+    def from_str(self, string:str):
         return super().from_str(string).date()
 
 class PickleOption(Option):
-    __dtype__ = None
-
-    def __init__(self, name, pickler=pickle, encoding='base64', **kwargs):
-        super().__init__(name, **kwargs)
-        self.pickler = pickler
-        self.encoding = encoding
+    __type__ = None
 
     def from_str(self, string:str):
-        return self.pickler.loads(codecs.decode(string.encode(), self.encoding))
+        encoding = self.section.cfg.encoding
+        pickled = base64.b64decode(string.encode(encoding))
+        return pickle.loads(pickled)
 
-    def to_str(self, value):
-        return codecs.encode(self.pickler.dumps(value), self.encoding).decode()
+    def to_str(self, value:Any):
+        encoding = self.section.cfg.encoding
+        pickled = pickle.dumps(value)
+        return base64.b64encode(pickled).decode(encoding)
 
 class JSONOption(Option):
-    __dtype__ = None
+    __type__ = None
     __empty__ = ('', '{}'), dict()
 
     def from_str(self, string:str):
         return json.loads(string)
 
-    def to_str(self, value):
+    def to_str(self, value:dict):
         return json.dumps(value)
 
 DictOption = JSONOption

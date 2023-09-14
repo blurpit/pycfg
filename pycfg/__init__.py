@@ -99,7 +99,7 @@ class ConfigFile:
         if not isinstance(option, UnlinkedOption):
             self.parser.set(
                 section.name, option.name,
-                option.to_str(value)
+                option.raw_value
             )
 
     def save(self):
@@ -237,12 +237,13 @@ class Option:
 
     def set(self, value:Any):
         # Check value type
-        if not isinstance(value, self.__type__):
+        if self.__type__ is not None and not isinstance(value, self.__type__):
             raise TypeError("{}/{} expected type '{}', got '{}'".format(
                 self.section.name, self.name, self.__type__.__name__, type(value).__name__
             ))
 
         self.value = value
+        self.raw_value = self.to_str(value)
 
     def from_str(self, string:str) -> Any:
         return self.__type__(string)
@@ -264,14 +265,14 @@ class Option:
                 return
             else:
                 raise e from None
-        self.value = self.raw_value.replace('\n', ' ').strip()
 
-        if self.value.lower() in self.__empty__[0]:
+        val = self.raw_value.replace('\n', ' ').strip()
+        if val.lower() in self.__empty__[0]:
             # Empty value
             self.value = self.__empty__[1]
         else:
             # Set value using from_str
-            self.value = self.from_str(self.value)
+            self.value = self.from_str(val)
 
     def __str__(self):
         return "<{} '{}/{}'>".format(type(self).__name__, self.section.name, self.name)
