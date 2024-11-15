@@ -402,8 +402,13 @@ class Option(ABC, Generic[T]):
     Defines the values that count as empty. The first element should be a tuple
     of all the strings in a config file that should be interpreted as empty (these
     are case insensitive). The second element is the empty value, for example 
-    ``None``, ``0``, ``[]``, etc. The empty value should be either None or a falsey
+    ``None``, ``0``, ``()``, etc. The empty value should be either None or a falsey
     value of whatever type the option value is.
+    
+    Because __empty__ is defined at the class level, the same empty value will be 
+    returned for every instance of the Option. As such, you should avoid using
+    mutable objects as your empty value. Instead, set ``__empty__ = (), None`` and
+    implement a falsey check in ``from_str()``.
     """
 
     def __init__(self, name: str, *, required: bool = True):
