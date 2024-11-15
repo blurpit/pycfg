@@ -491,13 +491,18 @@ class Option(ABC, Generic[T]):
         """
         Callback function for when this option is registered to a Section.
 
-        :param section:
-        :return:
+        This function should return True if the option should be added into the section's
+        list of options. For most options this is true, however there may be some cases where
+        you want to return False. For example, if the option replaces itself with one or more
+        other options, as is the case with OptionCollection.
+
+        :param section: The section to register this option to
+        :return: Whether the option should be added to the section's option list
         """
         self.section = section
         return True
 
-    def parse(self, parser:ConfigParser, section_name:str):
+    def parse(self, parser: ConfigParser, section_name: str):
         """ Read the option value from the config file """
         try:
             self.raw_value = parser.get(section_name, self.name)
@@ -554,13 +559,12 @@ class UnlinkedOption(Option[T]):
     def from_str(self, string: str) -> T:
         pass
 
-    def parse(self, parser, section_name):
-        # Unlinked options have nothing to read
+    def parse(self, parser: ConfigParser, section_name: str):
         pass
+
 
 class DerivedOption(UnlinkedOption[T]):
     """ See ``DerivedOption.__init__()`` """
-
     def __init__(self, name: str, value: Callable[..., T], references: List[Union[str, Tuple[str, str]]]):
         """
         A DerivedOption is an option that is calculated from the values of other options.
@@ -639,20 +643,96 @@ class DerivedOption(UnlinkedOption[T]):
 
 
 class OptionCollection(UnlinkedOption):
-    def __init__(self, option_class: Type[Option], *args, **kwargs):
-        super().__init__('')
-        self.option_class = option_class
-        self.args = args
-        self.kwargs = kwargs
+    """ See ``OptionCollection.__init__()`` """
+    def __init__(self, option_maker: Callable[[str], Option[Any]]):
+        """
+        A collection of options. An OptionCollection will read all options written under
+        a section in the config file, and create an Option for each one. It takes an
+        option maker as a parameter, which is a function that takes in the name of an
+        option and returns a new Option.
 
-    def on_register(self, section:Section):
+        OptionCollections are useful for when you want the config file to determine the
+        options in your config rather than the other way around, and those options all
+        have the same type.
+
+        The OptionCollection will consume all options within a section that don't already
+        have an Option object attached to it. So, if you have other options in the section
+        that you don't want included in the OptionCollection, put those above the
+        OptionCollection when you define your Section.
+
+        Example:
+        ::
+
+            [MySection]
+            A = 1
+            B = 2
+            C = 3
+            SomethingElse = Hello world
+
+            def create(self):
+                Section(
+                    self, 'MySection',
+                    StringOption('SomethingElse'),
+                    OptionCollection(
+                        lambda name: IntOption(name)
+                    )
+                )
+
+        In this example, the ``MySection`` section will have 3 IntOptions named
+        ``A``, ``B``, and ``C``, and a StringOption named ``SomethingElse``.
+
+        :param option_maker: Function that creates an Option given the option name
+        """
+        super().__init__('')
+        self.option_maker = option_maker
+
+    def on_register(self, section: Section):
+        super().on_register(section)
         for name in section.cfg.parser[section.name]:
             if name not in section:
-                section.register_option(self.option_class(name, *self.args, **self.kwargs))
-
+                section.register_option(self.option_maker(name))
+        return False
 
 class SectionCollection:
+    """ See ``SectionCollection.__init__()`` """
     def __init__(self, cfg: ConfigFile, *options: Option):
+        """
+        A collection of sections. A SectionCollection will read all the sections in
+        the config file, and create a Section for each one. It takes as parameters all
+        the Options you want in each section, the same way you'd make a regular Section.
+
+        SectionCollections are useful for when you want the config file to determine the
+        sections in your config rather than the other way around, and those sections all
+        share the same structure.
+
+        The SectionCollection will consume all sections that aren't already defined in
+        the ConfigFile. So, if you have other sections in the config that you don't want
+        included in the SectionCollection, define those first in your ``create()`` method.
+
+        Example:
+        ::
+
+            [SecOne]
+            Name = Alice
+
+            [SecTwo]
+            Name = Bob
+
+            [SecThree]
+            Name = Charlie
+
+            def create(self):
+                SectionCollection(
+                    self,
+                    StringOption('Name')
+                )
+
+        In this example, the config will have three sections in it: ``SecOne``, ``SecTwo``,
+        and ``SecThree``. Each section will have a StringOption called ``Name``.
+
+        :param cfg: ConfigFile to attach all the Sections to
+        :param options: Options to create for each Section
+        """
         for section_name in cfg.parser:
             if section_name != 'DEFAULT' and section_name not in cfg:
                 opt_copies = (copy(option) for option in options)
