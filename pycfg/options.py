@@ -4,9 +4,9 @@ import pickle
 from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List
+from typing import List, Optional, Tuple, Union
 
-from . import Option, T
+from .cfg import Option, Section, T, UnlinkedOption
 
 
 class StrOption(Option[str]):
@@ -189,3 +189,132 @@ class DictOption(Option[dict]):
         return json.dumps(value)
 
 JsonOption = DictOption
+
+class DerivedOption(UnlinkedOption[T]):
+    """ See ``DerivedOption.__init__()`` """
+    def __init__(self, name: str, value: Callable[..., T], references: List[Union[str, Tuple[str, str]]]):
+        """
+        A DerivedOption is an option that is calculated from the values of other options.
+
+        To make a DerivedOption, pass in a value function and a list of references. The
+        references are the other options that this derived option is calculated from.
+        Each reference can be one of two formats:
+
+            1. A tuple containing the section name of the referenced option, followed by
+               the option name, e.g. ``('MySection', 'MyOption')``
+            2. The name of the referenced option only, if the option is in the same section
+               as the derived option.
+
+        The value function takes in as parameters the values of the referenced options,
+        in the same order as the references list. It returns the value for the derived
+        option.
+
+        Examples:
+        ::
+
+            def create(self):
+                Section(
+                    self, 'SecOne',
+                    IntOption('OptA')
+                )
+                Section(
+                    self, 'SecTwo',
+                    IntOption('OptB'),
+                    # Create a derived option referencing OptB
+                    # in the same section.
+                    DerivedOption(
+                        'TripleB',
+                        lambda b: 3*b,
+                        ['OptB']
+                    ),
+                    # Create a derived option referencing OptB
+                    # as well as OptA from a different section
+                    DerivedOption(
+                        'ABSum',
+                        lambda a, b: a+b,
+                        [('SecOne', 'OptA'), 'OptB']
+                    )
+                )
+
+        :param name: Name of the option
+        :param value: Function that takes referenced option values and returns the
+            derived option value
+        :param references: List of referenced option names, or (section, option) name
+            pairs
+        """
+        super().__init__(name)
+        self.value_func = value
+
+        self.references: List[Tuple[Optional[str], str]] = []
+        for i, ref in enumerate(references):
+            # If a section wasn't passed, fill in None to be replaced later
+            if isinstance(ref, str):
+                self.references.append((None, ref))
+            else:
+                self.references.append(ref)
+
+    def set(self, _):
+        raise ValueError('Cannot set value on a DerivedOption')
+
+    @property
+    def value(self) -> T:
+        return self.value_func(*self._get_args())
+
+    def _get_args(self):
+        for sec_name, opt_name in self.references:
+            if sec_name is None:
+                section = self.section
+            else:
+                section = self.section.cfg[sec_name]
+            yield section[opt_name]
+
+class OptionCollection(UnlinkedOption):
+    """ See ``OptionCollection.__init__()`` """
+    def __init__(self, option_maker: Callable[[str], Option[Any]]):
+        """
+        A collection of options. An OptionCollection will read all options written under
+        a section in the config file, and create an Option for each one. It takes an
+        option maker as a parameter, which is a function that takes in the name of an
+        option and returns a new Option.
+
+        OptionCollections are useful for when you want the config file to determine the
+        options in your config rather than the other way around, and those options all
+        have the same type.
+
+        The OptionCollection will consume all options within a section that don't already
+        have an Option object attached to it. So, if you have other options in the section
+        that you don't want included in the OptionCollection, put those above the
+        OptionCollection when you define your Section.
+
+        Example:
+        ::
+
+            [MySection]
+            A = 1
+            B = 2
+            C = 3
+            SomethingElse = Hello world
+
+            def create(self):
+                Section(
+                    self, 'MySection',
+                    StringOption('SomethingElse'),
+                    OptionCollection(
+                        lambda name: IntOption(name)
+                    )
+                )
+
+        In this example, the ``MySection`` section will have 3 IntOptions named
+        ``A``, ``B``, and ``C``, and a StringOption named ``SomethingElse``.
+
+        :param option_maker: Function that creates an Option given the option name
+        """
+        super().__init__('')
+        self.option_maker = option_maker
+
+    def on_register(self, section: Section):
+        super().on_register(section)
+        for name in section.cfg.parser[section.name]:
+            if name not in section:
+                section.register_option(self.option_maker(name))
+        return False
