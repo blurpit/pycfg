@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import codecs
 from abc import ABC, abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
@@ -87,7 +89,7 @@ class ConfigFile:
         for section in self:
             section.parse(self.parser)
 
-    def register_section(self, section: 'Section'):
+    def register_section(self, section: Section):
         """ Register a section with this config file. """
         if section in self:
             raise DuplicateSectionError(section.name)
@@ -95,7 +97,7 @@ class ConfigFile:
         if section.on_register(self):
             self._sections[section.name] = section
 
-    def create_section(self, section: 'Section'):
+    def create_section(self, section: Section):
         """
         Create a new section in the config file.
 
@@ -103,7 +105,7 @@ class ConfigFile:
         """
         self.parser.add_section(section.name)
 
-    def delete_section(self, section_name: str) -> 'Section':
+    def delete_section(self, section_name: str) -> Section:
         """
         Delete a section from the file, and returns the removed Section.
 
@@ -232,7 +234,7 @@ class ConfigFile:
 
 
 class Section:
-    def __init__(self, cfg: ConfigFile, name: str, *options: 'Option'):
+    def __init__(self, cfg: ConfigFile, name: str, *options: Option):
         """
         Create a new section and attach it to a ConfigFile. Call this constructor inside
         your ``create()`` method of your ConfigFile.
@@ -249,7 +251,7 @@ class Section:
         for option in options:
             self.register_option(option)
 
-    def register_option(self, option: 'Option'):
+    def register_option(self, option: Option):
         """
         Register an option with this section.
 
