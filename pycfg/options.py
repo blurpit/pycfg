@@ -1,5 +1,4 @@
 import base64
-import codecs
 import datetime as dt
 import decimal
 import json
@@ -37,8 +36,8 @@ class ListOption(Option):
     __type__ = list
     __empty__ = ('', '[]'), list()
 
-    def __init__(self, name:str, delimiter:Union[str, re.Pattern]=', ', elem_types:Type=str, *, optional:bool=False):
-        super().__init__(name, optional=optional)
+    def __init__(self, name:str, delimiter:Union[str, re.Pattern]=', ', elem_types:Type=str, *, required:bool=True):
+        super().__init__(name, required=required)
         self.elem_types = elem_types
         self.delimiter = delimiter
 
@@ -77,8 +76,8 @@ class SetOption(ListOption):
 class RangeOption(Option):
     __type__ = range
 
-    def __init__(self, name:str, delimiter:str='-', *, optional:bool=False):
-        super().__init__(name, optional=optional)
+    def __init__(self, name:str, delimiter:str='-', *, required:bool=True):
+        super().__init__(name, required=required)
         self.delimiter = delimiter
 
     def from_str(self, string:str):
@@ -92,8 +91,8 @@ class DateTimeOption(Option):
     ISOFORMAT = object()
     __type__ = dt.datetime
 
-    def __init__(self, name:str, fmt:str=ISOFORMAT, *, optional:bool=False):
-        super().__init__(name, optional=optional)
+    def __init__(self, name:str, fmt:str=ISOFORMAT, *, required:bool=True):
+        super().__init__(name, required=required)
         self.fmt = fmt
 
     def from_str(self, string:str):
