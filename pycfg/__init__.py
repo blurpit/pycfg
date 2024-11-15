@@ -1,5 +1,5 @@
 import codecs
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
 from copy import copy
 from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, TextIO, Tuple, Type, TypeVar, Union
@@ -385,12 +385,12 @@ class Section:
 
 
 T = TypeVar('T')
-class Option(Generic[T]):
+class Option(ABC, Generic[T]):
     """
     Base class for Options.
     """
 
-    __type__: Type[T] = str
+    __type__: Type[T] = NotImplemented
     """
     Type to check the option's value against when setting a new value. Set it to
     None to skip type checks. This is used with an ``isinstance()`` call, so you
@@ -454,6 +454,7 @@ class Option(Generic[T]):
         self.value = value
         self.raw_value = self.to_str(value)
 
+    @abstractmethod
     def from_str(self, string: str) -> T:
         """
         This function takes a string value for this option and should convert it to
@@ -470,8 +471,9 @@ class Option(Generic[T]):
         :param string: Text representation of the option value
         :return: Python representation of the option value
         """
-        return self.__type__(string)
+        raise NotImplementedError
 
+    @abstractmethod
     def to_str(self, value: T) -> str:
         """
         This function takes the value returned by ``from_str()`` and should convert it
@@ -483,7 +485,7 @@ class Option(Generic[T]):
         :param value: Python representation of the option value
         :return: Text representation of the option value
         """
-        return str(value)
+        raise NotImplementedError
 
     def on_register(self, section: Section) -> bool:
         """
@@ -520,7 +522,7 @@ class Option(Generic[T]):
     def __repr__(self):
         return "{}('{}')".format(type(self).__name__, self.name)
 
-class UnlinkedOption(Option):
+class UnlinkedOption(Option[T]):
     """
     An UnlinkedOption is an option that exists only in the ConfigFile object in
     Python, and is not actually written in the config file.
@@ -546,27 +548,85 @@ class UnlinkedOption(Option):
         # returns a different random number every time
         my_config['MySection']['MyRandom']
     """
+    def to_str(self, value: T) -> str:
+        pass
+
+    def from_str(self, string: str) -> T:
+        pass
+
     def parse(self, parser, section_name):
         # Unlinked options have nothing to read
         pass
 
+class DerivedOption(UnlinkedOption[T]):
+    """ See ``DerivedOption.__init__()`` """
 
-class DerivedOption(UnlinkedOption):
-    def __init__(self, name:str, value:Callable[..., Any], references:List[str | Tuple[str, str]]):
+    def __init__(self, name: str, value: Callable[..., T], references: List[Union[str, Tuple[str, str]]]):
+        """
+        A DerivedOption is an option that is calculated from the values of other options.
+
+        To make a DerivedOption, pass in a value function and a list of references. The
+        references are the other options that this derived option is calculated from.
+        Each reference can be one of two formats:
+
+            1. A tuple containing the section name of the referenced option, followed by
+               the option name, e.g. ``('MySection', 'MyOption')``
+            2. The name of the referenced option only, if the option is in the same section
+               as the derived option.
+
+        The value function takes in as parameters the values of the referenced options,
+        in the same order as the references list. It returns the value for the derived
+        option.
+
+        Examples:
+        ::
+
+            def create(self):
+                Section(
+                    self, 'SecOne',
+                    IntOption('OptA')
+                )
+                Section(
+                    self, 'SecTwo',
+                    IntOption('OptB'),
+                    # Create a derived option referencing OptB
+                    # in the same section.
+                    DerivedOption(
+                        'TripleB',
+                        lambda b: 3*b,
+                        ['OptB']
+                    ),
+                    # Create a derived option referencing OptB
+                    # as well as OptA from a different section
+                    DerivedOption(
+                        'ABSum',
+                        lambda a, b: a+b,
+                        [('SecOne', 'OptA'), 'OptB']
+                    )
+                )
+
+        :param name: Name of the option
+        :param value: Function that takes referenced option values and returns the
+            derived option value
+        :param references: List of referenced option names, or (section, option) name
+            pairs
+        """
         super().__init__(name)
         self.value_func = value
 
+        self.references: List[Tuple[Optional[str], str]] = []
         for i, ref in enumerate(references):
             # If a section wasn't passed, fill in None to be replaced later
             if isinstance(ref, str):
-                references[i] = (None, ref)
-        self.references = references
+                self.references.append((None, ref))
+            else:
+                self.references.append(ref)
 
     def set(self, _):
         raise ValueError('Cannot set value on a DerivedOption')
 
     @property
-    def value(self):
+    def value(self) -> T:
         return self.value_func(*self._get_args())
 
     def _get_args(self):
@@ -579,20 +639,20 @@ class DerivedOption(UnlinkedOption):
 
 
 class OptionCollection(UnlinkedOption):
-    def __init__(self, option_cls:Type[Option], *args, **kwargs):
+    def __init__(self, option_class: Type[Option], *args, **kwargs):
         super().__init__('')
-        self.option_cls = option_cls
+        self.option_class = option_class
         self.args = args
         self.kwargs = kwargs
 
     def on_register(self, section:Section):
         for name in section.cfg.parser[section.name]:
             if name not in section:
-                section.register_option(self.option_cls(name, *self.args, **self.kwargs))
+                section.register_option(self.option_class(name, *self.args, **self.kwargs))
 
 
 class SectionCollection:
-    def __init__(self, cfg:ConfigFile, *options:Option):
+    def __init__(self, cfg: ConfigFile, *options: Option):
         for section_name in cfg.parser:
             if section_name != 'DEFAULT' and section_name not in cfg:
                 opt_copies = (copy(option) for option in options)
