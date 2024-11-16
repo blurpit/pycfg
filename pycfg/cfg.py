@@ -4,7 +4,7 @@ import codecs
 from abc import ABC, abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
 from copy import copy
-from typing import Any, Dict, Generic, Iterable, List, Optional, TextIO, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, Generic, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
 
 class ConfigFile:
@@ -27,36 +27,36 @@ class ConfigFile:
     sections, or writing to the config file in any way.
     """
 
-    def __init__(self, file: Union[TextIO, str, None] = None, encoding: Optional[str] = None):
+    def __init__(self, filename: Optional[str] = None, encoding: Optional[str] = None):
         """
         Instantiate your config object. If a file or filepath is given here, the file will
         be read. If a file isn't given in the constructor, you can read one later using ``read()``.
 
-        :param file: File-like object or a file path to read, or None.
+        :param filename: Path to the config file to read, or None.
         :param encoding: File encoding, or None.
         """
-        self.file = file
+        self.filename = filename
         self.encoding = encoding
 
         self.parser: Optional[ConfigParser] = None
         self._sections: Dict[str, Section] = {}
-        if self.file:
+        if self.filename:
             self.read()
 
-    def read(self, file: Union[TextIO, str, None] = None, encoding: Optional[str] = None):
+    def read(self, filename: Optional[str] = None, encoding: Optional[str] = None):
         """
         Read a config file.
 
-        :param file: File-like object or a file path to read, if not already given in the constructor.
+        :param filename: Path to the config file to read, if not already given in the constructor.
         :param encoding: File encoding. Default is platform-specific
         :raise FileNotFoundError: if no file was given or if the file wasn't found
         """
         # Get the file
-        if file:
-            self.file = file
+        if filename:
+            self.filename = filename
         if encoding:
             self.encoding = encoding
-        if not self.file:
+        if not self.filename:
             raise FileNotFoundError('No file was given.')
 
         # Create parser
@@ -64,20 +64,11 @@ class ConfigFile:
         self.parser.optionxform = str
 
         # Open file
-        if isinstance(self.file, str):
-            # Open file path
-            self.file = codecs.open(
-                self.file,
-                mode='r' if self.__readonly__ else 'r+',
-                encoding=self.encoding
-            )
-        elif self.file.closed:
-            # Open file if not already open
-            self.file = codecs.open(
-                self.file.name,
-                mode='r' if self.__readonly__ else 'r+',
-                encoding=self.encoding
-            )
+        self.file = codecs.open(
+            self.filename,
+            mode='r' if self.__readonly__ else 'r+',
+            encoding=self.encoding
+        )
 
         # Read the file using configparser, and close the file
         self.parser.read_file(self.file)
@@ -213,16 +204,6 @@ class ConfigFile:
                 ...
         """
         raise NotImplementedError('ConfigFile classes need to implement the create() method')
-
-    @property
-    def filename(self) -> str:
-        """ Name of the file this ConfigFile is attached to, or (unknown). """
-        if isinstance(self.file, TextIO):
-            return self.file.name
-        elif isinstance(self.file, str):
-            return self.file
-        else:
-            return '(unknown)'
 
     @property
     def section_names(self) -> List[str]:
