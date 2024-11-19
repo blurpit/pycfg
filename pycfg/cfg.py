@@ -416,7 +416,7 @@ class Option(ABC, Generic[T]):
         self.name = name
         self.section: Optional[Section] = None
         self.required = required
-        self.raw_value: Optional[str] = None
+        self.raw_value: str = ''
         # Create an empty value if the object or class doesn't already have one
         if not hasattr(self, 'value') and not hasattr(self.__class__, 'value'):
             self.value: T = self.__empty__[1]
