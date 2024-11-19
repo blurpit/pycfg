@@ -513,7 +513,11 @@ class Option(ABC, Generic[T]):
             self.value = self.from_str(val)
 
     def __str__(self):
-        return "<{} '{}/{}'>".format(type(self).__name__, self.section.name, self.name)
+        cls = type(self).__name__
+        if self.section:
+            return "<{} '{}/{}'>".format(cls, self.section.name, self.name)
+        else:
+            return "<{} '{}' (unbound)>".format(cls, self.name)
 
     def __repr__(self):
         return "{}('{}')".format(type(self).__name__, self.name)
@@ -545,6 +549,7 @@ class UnlinkedOption(Option[T]):
         # returns a different random number every time
         my_config['MySection']['MyRandom']
     """
+    __empty__ = (), None
 
     def to_str(self, value: T) -> str:
         pass
