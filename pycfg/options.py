@@ -108,7 +108,7 @@ class RangeOption(Option[range]):
         Option for ranges of integers. The value is a standard python ``range()``.
         Start is inclusive, stop is exclusive.
 
-        TODO: support non-ints, and `step` parameter
+        TODO: support non-ints, `step` parameter, and inclusive end
 
         :param delimiter: String that separates the start & stop when writing to the
             config file. Default is ``-``, e.g. range(0, 10) will be written as "0-10".
@@ -165,13 +165,15 @@ class PickleOption(Option[T]):
 
     def from_str(self, string: str) -> T:
         encoding = self.section.cfg.encoding
-        pickled = base64.b64decode(string.encode(encoding))
+        encoded = string.encode(encoding) if encoding else string.encode()
+        pickled = base64.b64decode(encoded)
         return pickle.loads(pickled)
 
     def to_str(self, value: T):
         encoding = self.section.cfg.encoding
         pickled = pickle.dumps(value)
-        return base64.b64encode(pickled).decode(encoding)
+        b64 = base64.b64encode(pickled)
+        return b64.decode(encoding) if encoding else b64.decode()
 
 class DictOption(Option[dict]):
     """
