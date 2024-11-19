@@ -440,7 +440,10 @@ class Option(ABC, Generic[T]):
             ))
 
         self.value = value
-        self.raw_value = self.to_str(value)
+        if self.__empty__[0] and value == self.__empty__[1]:
+            self.raw_value = self.__empty__[0][0]
+        else:
+            self.raw_value = self.to_str(value)
 
     @abstractmethod
     def from_str(self, string: str) -> T:
