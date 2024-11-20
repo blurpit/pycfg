@@ -260,7 +260,7 @@ class DerivedOption(UnlinkedOption[T]):
             else:
                 self.references.append(ref)
 
-    def set(self, _):
+    def on_set(self, _):
         raise ValueError('Cannot set value on a DerivedOption')
 
     @property

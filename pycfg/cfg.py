@@ -127,22 +127,18 @@ class ConfigFile:
         # Convert str -> Section and make sure it is in the config
         if isinstance(section, str):
             section = self[section]
-            if section not in self:
-                raise NoSectionError(section.name)
 
         # Convert str -> Option and make sure it is in the section
         if isinstance(option, str):
             option = section.get_ref(option)
-            if option not in section:
-                raise NoOptionError(option.name, section.name)
 
         # Set option value
-        option.set(value)
+        option.on_set(value)
 
         if not isinstance(option, UnlinkedOption):
             self.parser.set(
                 section.name, option.name,
-                option.raw_value
+                option.to_str(option.value)
             )
 
     def save(self):
@@ -299,7 +295,8 @@ class Section:
         :param option_name: Name of the option to get
         :return: String value of the option
         """
-        return self.get_ref(option_name).raw_value
+        option = self.get_ref(option_name)
+        return option.to_str(option.value)
 
     def __getitem__(self, option_name: str) -> Any:
         """ Get the value of an option """
@@ -408,14 +405,15 @@ class Option(ABC, Generic[T]):
         self.name = name
         self.section: Optional[Section] = None
         self.required = required
-        self.raw_value: str = ''
         # Create an empty value if the object or class doesn't already have one
         if not hasattr(self, 'value') and not hasattr(self.__class__, 'value'):
             self.value: T = self.__empty__[1]
 
-    def set(self, value: T):
+    def on_set(self, value: T):
         """
-        Set the value of this option.
+        Callback function for when the value of this option is set. Default behavior
+        is to check the type of the passed in value using __type__, and set ``self.value``
+        to the new value. You can override this method to use custom behavior.
 
         The following are all equivalent:
         ::
@@ -434,10 +432,6 @@ class Option(ABC, Generic[T]):
             ))
 
         self.value = value
-        if self.__empty__[0] and value == self.__empty__[1]:
-            self.raw_value = self.__empty__[0][0]
-        else:
-            self.raw_value = self.to_str(value)
 
     @abstractmethod
     def from_str(self, string: str) -> T:
@@ -461,11 +455,11 @@ class Option(ABC, Generic[T]):
     @abstractmethod
     def to_str(self, value: T) -> str:
         """
-        This function takes the value returned by ``from_str()`` and should convert it
-        to a string. The return value of this function will be put into the config file.
+        This function converts the value of the option into a string that will be put
+        into the config file.
 
-        This function is called when the value of the option changes. The result will be
-        put into ``self.raw_value``.
+        This function is called when the value of the option is changed. The parameter
+        ``value`` is the same as ``self.value``.
 
         :param value: Python representation of the option value
         :return: Text representation of the option value
@@ -490,7 +484,7 @@ class Option(ABC, Generic[T]):
     def parse(self, parser: ConfigParser, section_name: str):
         """ Read the option value from the config file """
         try:
-            self.raw_value = parser.get(section_name, self.name)
+            raw_value = parser.get(section_name, self.name)
         except NoOptionError as e:
             if self.required:
                 raise e from None
@@ -498,7 +492,7 @@ class Option(ABC, Generic[T]):
                 self.value = self.__empty__[1]
                 return
 
-        val = self.raw_value.replace('\n', ' ').strip()
+        val = raw_value.replace('\n', ' ').strip()
         if val.lower() in self.__empty__[0]:
             # Empty value
             self.value = self.__empty__[1]
