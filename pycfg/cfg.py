@@ -88,14 +88,6 @@ class ConfigFile:
         if section.on_register(self):
             self._sections[section.name] = section
 
-    # def create_section(self, section: Section):
-    #     """
-    #     Create a new section in the config file.
-    #
-    #     :param section: New Section to write into the file
-    #     """
-    #     self.parser.add_section(section.name)
-
     def delete_section(self, section_name: str) -> Section:
         """
         Delete a section from the file, and returns the removed Section.
