@@ -1,10 +1,9 @@
 import base64
 import json
 import pickle
-from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from .cfg import Option, Section, T, UnlinkedOption
 
