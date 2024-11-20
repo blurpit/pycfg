@@ -21,6 +21,7 @@ class StrOption(Option[str]):
 class IntOption(Option[int]):
     """ Option for integers """
     __type__ = int
+    __empty__ = ('',), 0
 
     def from_str(self, string: str) -> int:
         return int(string)
@@ -31,6 +32,7 @@ class IntOption(Option[int]):
 class FloatOption(Option[float]):
     """ Option for floats """
     __type__ = float
+    __empty__ = ('',), 0.0
 
     def from_str(self, string: str) -> float:
         return float(string)
@@ -51,6 +53,7 @@ class DecimalOption(Option[Decimal]):
 class BoolOption(Option[bool]):
     """ Option for booleans """
     __type__ = bool
+    __empty__ = ('',), False
     __truthy__ = ('true', 'yes', 'on', 'enabled')
     """ Text values that are considered truthy. """
 
@@ -184,6 +187,8 @@ class DictOption(Option[dict]):
     __empty__ = (), None
 
     def from_str(self, string: str) -> dict:
+        if not string:
+            return {}
         return json.loads(string)
 
     def to_str(self, value: dict):
