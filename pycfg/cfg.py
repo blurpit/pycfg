@@ -372,7 +372,7 @@ class Option(ABC, Generic[T]):
     should avoid using types from ``typing``.
     """
 
-    __empty__: Tuple[Tuple[str, ...], Optional[T]] = ('', 'none', 'null'), None
+    __empty__: Tuple[Tuple[str, ...], Optional[T]] = (('', 'none', 'null'), None)
     """
     Defines the values that count as empty. The first element should be a tuple
     of all the strings in a config file that should be interpreted as empty (these
