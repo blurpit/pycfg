@@ -122,7 +122,7 @@ class ConfigFile:
         :param value: New value to set the option to
         """
         if self.__readonly__:
-            raise PermissionError("Config file '%s' is immutable." % self.filename)
+            raise PermissionError("Config file '%s' is read-only." % self.filename)
 
         # Convert str -> Section and make sure it is in the config
         if isinstance(section, str):
