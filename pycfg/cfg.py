@@ -595,7 +595,7 @@ class SectionCollection:
             def create(self):
                 SectionCollection(
                     self,
-                    StringOption('Name')
+                    StrOption('Name')
                 )
 
         In this example, the config will have three sections in it: ``SecOne``, ``SecTwo``,
