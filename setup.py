@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pycfg",
-    version="1.1.2",
+    version="1.1.3",
     author="David Schneider",
     author_email="davidschneider821@gmail.com",
     description="A package for defining config file structure in python, "
