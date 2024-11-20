@@ -238,6 +238,12 @@ class DerivedOption(UnlinkedOption[T]):
                     )
                 )
 
+        You can access the values of the derived options the same as any other option.
+        In the above example, with ``my_cfg['SecTwo']['TripleB']`` and
+        ``my_cfg['SecTwo']['ABSum']``.
+
+        The value function is called every time the option is accessed.
+
         :param name: Name of the option
         :param value: Function that takes referenced option values and returns the
             derived option value
@@ -308,6 +314,11 @@ class OptionCollection(UnlinkedOption):
 
         In this example, the ``MySection`` section will have 3 IntOptions named
         ``A``, ``B``, and ``C``, and a StringOption named ``SomethingElse``.
+
+        For simple option types, the constructor already acts as a (str) -> Option
+        function, so you can simply pass in the option class itself. In the above
+        example, this would look like ``OptionCollection(IntOption)``, with no need
+        for the lambda.
 
         :param option_maker: Function that creates an Option given the option name
         """
