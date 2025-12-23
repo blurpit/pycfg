@@ -418,7 +418,7 @@ class Option(ABC, Generic[T]):
         if not hasattr(self, 'value') and not hasattr(self.__class__, 'value'):
             self.value = self.__empty__[1]
 
-    def on_set(self, value: T):
+    def on_set(self, value: Any):
         """
         Callback function for when the value of this option is set. Default behavior
         is to check the type of the passed in value using __type__, and set ``self.value``

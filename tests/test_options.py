@@ -1,15 +1,14 @@
 from datetime import date, datetime
 from decimal import Decimal
 from random import random
+from typing import Any, Dict, List, Tuple
 
 import pytest
 
-from pycfg import BoolOption, ConfigFile, DateOption, DateTimeOption, DecimalOption, DerivedOption, DictOption, \
-    FloatOption, IntOption, \
-    ListOption, \
-    Option, OptionCollection, PickleOption, RangeOption, \
-    Section, \
-    SectionCollection, StrOption
+from pycfg import BoolOption, ConfigFile, DateOption, DateTimeOption, DecimalOption, \
+    DerivedOption, DictOption, FloatOption, IntOption, ListOption, Option, OptionCollection, \
+    PickleOption, RangeOption, Section, SectionCollection, StrOption
+
 from .conftest import make_file
 
 
@@ -241,7 +240,7 @@ def test_pickle_option():
                 PickleOption('Pickler')
             )
 
-    pickle = [{'cucumber', 'zucchini'}, {'dill': 2.99, 'oregano': 4.95, 'parsely': 3}]
+    pickle: Any = [{'cucumber', 'zucchini'}, {'dill': 2.99, 'oregano': 4.95, 'parsely': 3}]
 
     with make_file(text) as fn:
         t = Test(fn)
@@ -274,7 +273,7 @@ def test_dict_option():
                 DictOption('Json')
             )
 
-    json = {
+    json: Dict[str, Any] = {
         'apple': ['fuji', 'granny smith'],
         'banana': 127,
         'grape': {'green': 20, 'red': 'yes'}
@@ -453,8 +452,8 @@ def test_custom_self_option():
     Two = two, 2
     """
 
-    class CustomOption(Option):
-        def on_set(self, value):
+    class CustomOption(Option['CustomOption']):
+        def on_set(self, value: Tuple[str, int]):
             self.text, self.number = value
 
         def from_str(self, string: str):
@@ -463,7 +462,7 @@ def test_custom_self_option():
             self.number = int(val)
             return self
 
-        def to_str(self, value) -> str:
+        def to_str(self, value: Any) -> str:
             return f'{self.text}, {self.number}'
 
     class Test(ConfigFile):

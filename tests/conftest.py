@@ -4,7 +4,7 @@ import tempfile
 
 
 @contextlib.contextmanager
-def make_file(text):
+def make_file(text: str):
     tmp = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.cfg')
     try:
         tmp.write(text)
