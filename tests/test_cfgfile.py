@@ -3,6 +3,7 @@ from configparser import NoOptionError, NoSectionError
 import pytest
 
 from pycfg import ConfigFile, Section, StrOption
+
 from .conftest import make_file
 
 
@@ -228,4 +229,3 @@ def test_optional_option():
     with make_file(text) as fn:
         t = Test(fn)
         assert t['Sec']['Foo'] is None
-

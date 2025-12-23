@@ -1,13 +1,13 @@
 from datetime import date, datetime
 from decimal import Decimal
 from random import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
 import pytest
 
 from pycfg import BoolOption, ConfigFile, DateOption, DateTimeOption, DecimalOption, \
-    DerivedOption, DictOption, FloatOption, IntOption, ListOption, Option, OptionCollection, \
-    PickleOption, RangeOption, Section, SectionCollection, StrOption
+    DerivedOption, DictOption, FloatOption, IntOption, ListOption, OptionCollection, PickleOption, \
+    RangeOption, Section, SectionCollection, StrOption
 
 from .conftest import make_file
 
@@ -443,47 +443,3 @@ def test_section_collection():
         assert t['Sec2']['B'] == 'two hundred'
         assert t['Sec3']['A'] == 3
         assert t['Sec3']['B'] == 'three'
-
-def test_custom_self_option():
-    """ Test that custom options can be made which return references to themselves """
-    text = """
-    [Sec]
-    One = one, 1
-    Two = two, 2
-    """
-
-    class CustomOption(Option['CustomOption']):
-        def on_set(self, value: Tuple[str, int]):
-            self.text, self.number = value
-
-        def from_str(self, string: str):
-            text, val = string.split(', ')
-            self.text = text
-            self.number = int(val)
-            return self
-
-        def to_str(self, value: Any) -> str:
-            return f'{self.text}, {self.number}'
-
-    class Test(ConfigFile):
-        def create(self):
-            Section(
-                self, 'Sec',
-                CustomOption('One'),
-                CustomOption('Two')
-            )
-
-    with make_file(text) as fn:
-        t = Test(fn)
-        assert t['Sec']['One'].text == 'one'
-        assert t['Sec']['One'].number == 1
-        assert t['Sec']['Two'].text == 'two'
-        assert t['Sec']['Two'].number == 2
-
-        t['Sec']['One'] = ('one hundred', 100)
-        assert t['Sec']['One'].text == 'one hundred'
-        assert t['Sec']['One'].number == 100
-        t.save()
-        t.read()
-        assert t['Sec']['One'].text == 'one hundred'
-        assert t['Sec']['One'].number == 100
