@@ -1,5 +1,8 @@
 .idea
 .vscode
-__pycache__
+.venv
+**/__pycache__
+*.egg-info
+
 test.py
 test.cfg
