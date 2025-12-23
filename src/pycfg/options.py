@@ -3,7 +3,8 @@ import json
 import pickle
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Callable, List, Optional, Tuple, Union
+from types import NoneType
+from typing import Any, Callable, Dict, Iterable, List, Never, Optional, Tuple, Union
 
 from .cfg import Option, Section, T, UnlinkedOption
 
@@ -93,7 +94,7 @@ class ListOption(Option[List[T]]):
         strings = string.split(self.delimiter)
 
         # Convert each string into the item type
-        items = []
+        items: List[T] = []
         for item in strings:
             items.append(self.item_type(item))
 
@@ -126,10 +127,9 @@ class RangeOption(Option[range]):
         return str(value.start) + self.delimiter + str(value.stop)
 
 class DateTimeOption(Option[datetime]):
-    ISOFORMAT = object()
     __type__ = datetime
 
-    def __init__(self, name: str, fmt: str = ISOFORMAT, *, required: bool = True):
+    def __init__(self, name: str, fmt: Optional[str] = None, *, required: bool = True):
         """
         Option for dates & times
 
@@ -140,23 +140,41 @@ class DateTimeOption(Option[datetime]):
         self.fmt = fmt
 
     def from_str(self, string: str) -> datetime:
-        if self.fmt is self.ISOFORMAT:
+        if self.fmt is None:
             return datetime.fromisoformat(string)
         else:
             return datetime.strptime(string, self.fmt)
 
     def to_str(self, value: datetime):
-        if self.fmt is self.ISOFORMAT:
+        if self.fmt is None:
             return value.isoformat()
         else:
             return value.strftime(self.fmt)
 
-class DateOption(DateTimeOption):
-    """ Option for dates """
+class DateOption(Option[date]):
     __type__ = date
 
+    def __init__(self, name: str, fmt: Optional[str] = None, *, required: bool = True):
+        """
+        Option for dates
+
+        :param fmt: Date/time format to use when writing the config file. If omitted,
+            ISO format is used.
+        """
+        super().__init__(name, required=required)
+        self.fmt = fmt
+
     def from_str(self, string: str) -> date:
-        return super().from_str(string).date()
+        if self.fmt is None:
+            return date.fromisoformat(string)
+        else:
+            return datetime.strptime(string, self.fmt).date()
+
+    def to_str(self, value: date):
+        if self.fmt is None:
+            return value.isoformat()
+        else:
+            return value.strftime(self.fmt)
 
 class PickleOption(Option[T]):
     """
@@ -177,7 +195,7 @@ class PickleOption(Option[T]):
         b64 = base64.b64encode(pickled)
         return b64.decode(encoding) if encoding else b64.decode()
 
-class DictOption(Option[dict]):
+class DictOption(Option[Dict[str, Any]]):
     """
     Option for dictionaries. When writing to the config file, the dictionary
     will be JSON stringified. Therefore the dictionary must be JSON serializable.
@@ -186,12 +204,12 @@ class DictOption(Option[dict]):
     __type__ = dict
     __empty__ = (), None
 
-    def from_str(self, string: str) -> dict:
+    def from_str(self, string: str) -> Dict[str, Any]:
         if not string:
             return {}
         return json.loads(string)
 
-    def to_str(self, value: dict):
+    def to_str(self, value: Dict[str, Any]):
         return json.dumps(value)
 
 JsonOption = DictOption
@@ -258,21 +276,21 @@ class DerivedOption(UnlinkedOption[T]):
         self.value_func = value
 
         self.references: List[Tuple[Optional[str], str]] = []
-        for i, ref in enumerate(references):
+        for ref in references:
             # If a section wasn't passed, fill in None to be replaced later
             if isinstance(ref, str):
                 self.references.append((None, ref))
             else:
                 self.references.append(ref)
 
-    def on_set(self, _):
+    def on_set(self, value: T) -> Never:
         raise ValueError('Cannot set value on a DerivedOption')
 
     @property
     def value(self) -> T:
         return self.value_func(*self._get_args())
 
-    def _get_args(self):
+    def _get_args(self) -> Iterable[Any]:
         for sec_name, opt_name in self.references:
             if sec_name is None:
                 section = self.section
@@ -280,7 +298,7 @@ class DerivedOption(UnlinkedOption[T]):
                 section = self.section.cfg[sec_name]
             yield section[opt_name]
 
-class OptionCollection(UnlinkedOption):
+class OptionCollection(UnlinkedOption[None]):
     """ See ``OptionCollection.__init__()`` """
     def __init__(self, option_maker: Callable[[str], Option[Any]]):
         """

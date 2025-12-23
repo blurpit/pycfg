@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import codecs
 from abc import ABC, abstractmethod
-from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, NoSectionError
+from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, \
+    NoSectionError
 from copy import copy
-from typing import Any, Dict, Generic, Iterable, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, Generic, Iterable, List, Never, Optional, Tuple, TypeVar, Union
 
 
 class ConfigFile:
     """
     The base class for python config files. Create a class that inherits from ConfigFile
     and override the ``create()`` method to make your config file definition.
-    ::
+    :
 
         class MyConfig(ConfigFile):
             def create(self):
@@ -29,8 +30,8 @@ class ConfigFile:
 
     def __init__(self, filename: Optional[str] = None, encoding: Optional[str] = None):
         """
-        Instantiate your config object. If a file or filepath is given here, the file will
-        be read. If a file isn't given in the constructor, you can read one later using ``read()``.
+        Instantiate your config object. If a filepath is given here, the file will be read. If a
+        filename isn't given in the constructor, you can read a file later using ``read()``.
 
         :param filename: Path to the config file to read, or None.
         :param encoding: File encoding, or None.
@@ -38,7 +39,10 @@ class ConfigFile:
         self.filename = filename
         self.encoding = encoding
 
-        self.parser: Optional[ConfigParser] = None
+        # Create parser
+        self.parser = ConfigParser()
+        self.parser.optionxform = lambda optionstr: optionstr # enables case sensitivity
+
         self._sections: Dict[str, Section] = {}
         if self.filename:
             self.read()
@@ -59,10 +63,6 @@ class ConfigFile:
         if not self.filename:
             raise FileNotFoundError('No file was given.')
 
-        # Create parser
-        self.parser = ConfigParser()
-        self.parser.optionxform = str
-
         # Open file
         self.file = codecs.open(
             self.filename,
@@ -71,8 +71,10 @@ class ConfigFile:
         )
 
         # Read the file using configparser, and close the file
-        self.parser.read_file(self.file)
-        self.file.close()
+        try:
+            self.parser.read_file(self.file)
+        finally:
+            self.file.close()
 
         # Call create() to register all sections, then parse them all
         self._sections = {}
@@ -95,6 +97,8 @@ class ConfigFile:
         :param section_name: Name of the section to delete
         :return: Section object that was deleted
         """
+        if not self.parser:
+            raise RuntimeError("Please read a file first")
         if section_name not in self:
             raise NoSectionError(section_name)
         self.parser.remove_section(section_name)
@@ -106,12 +110,11 @@ class ConfigFile:
             raise NoSectionError(section)
         return self._sections[section]
 
-    def set(self, section: Union['Section', str], option: Union['Option', str], value: Any):
+    def set(self, section: Union['Section', str], option: Union['Option[Any]', str], value: Any):
         """
         Set the value of an option in the config.
 
         The following are all equivalent:
-        ::
 
             my_config.set('Section One', 'SomeOption', 3)
             my_config['Section One'].set('SomeOption', 3)
@@ -145,7 +148,7 @@ class ConfigFile:
         """
         Writes changes to the file. If this ConfigFile is readonly, do nothing.
         """
-        if not self.__readonly__:
+        if not self.__readonly__ and self.filename:
             with open(self.filename, 'w', encoding=self.encoding) as file:
                 self.parser.write(file)
 
@@ -178,7 +181,7 @@ class ConfigFile:
         """
         Override this method in a child class to define the structure of your config file.
         For each section in your config, simply create a Section object inside ``create()``.
-        ::
+        :
 
             def create(self):
                 Section(
@@ -203,7 +206,7 @@ class ConfigFile:
 
 
 class Section:
-    def __init__(self, cfg: ConfigFile, name: str, *options: Option):
+    def __init__(self, cfg: ConfigFile, name: str, *options: 'Option[Any]'):
         """
         Create a new section and attach it to a ConfigFile. Call this constructor inside
         your ``create()`` method of your ConfigFile.
@@ -214,13 +217,13 @@ class Section:
         """
         self.cfg = cfg
         self.name = name
-        self._options: Dict[str, Option] = {}
+        self._options: Dict[str, Option[Any]] = {}
 
         self.cfg.register_section(self)
         for option in options:
             self.register_option(option)
 
-    def register_option(self, option: Option):
+    def register_option(self, option: 'Option[Any]'):
         """
         Register an option with this section.
 
@@ -239,7 +242,7 @@ class Section:
         self.cfg = cfg
         return True
 
-    def get_ref(self, option_name: str) -> 'Option':
+    def get_ref(self, option_name: str) -> 'Option[Any]':
         """
         Get a reference to the Option object itself, rather than the value of
         that option, given an option name.
@@ -256,7 +259,7 @@ class Section:
         """
         Get the value of an option if it exists, otherwise return the given default.
         Similar to ``dict.get()``.
-        ::
+        :
 
             my_config['MySection'].get('MyOption', -1) # returns the value of MyOption
             my_config['MySection'].get('BogusOption', -1) # returns -1
@@ -271,12 +274,11 @@ class Section:
         else:
             return default
 
-    def set(self, option: Union['Option', str], value: Any):
+    def set(self, option: Union['Option[Any]', str], value: Any):
         """
         Set the value of an option in the config.
 
         The following are all equivalent:
-        ::
 
             my_config.set('Section One', 'SomeOption', 3)
             my_config['Section One'].set('SomeOption', 3)
@@ -287,7 +289,7 @@ class Section:
         """
         self.cfg.set(self, option, value)
 
-    def get_raw(self, option_name) -> str:
+    def get_raw(self, option_name: str) -> str:
         """
         Get the 'raw value' of the option. The raw value is the string value
         of the option exactly as written in the config file.
@@ -314,7 +316,7 @@ class Section:
         """ Iterates the names of the options in this section """
         return iter(self._options)
 
-    def __contains__(self, option: Union['Option', str]):
+    def __contains__(self, option: Union['Option[Any]', str]):
         """
         Return whether the section contains the given option. Can be either the option
         name, or an Option object. If given an Option object, it must be registered to
@@ -362,7 +364,7 @@ class Option(ABC, Generic[T]):
     Base class for Options.
     """
 
-    __type__: Type[T] = NotImplemented
+    __type__: Union[type, Tuple[type, ...], None] = None
     """
     Type to check the option's value against when setting a new value. Set it to
     None to skip type checks. This is used with an ``isinstance()`` call, so you
@@ -383,11 +385,18 @@ class Option(ABC, Generic[T]):
     implement a falsey check in ``from_str()``.
     """
 
+    value: Optional[T]
+    """
+    Stores the value for the option.
+
+    ``value`` will be ``None`` before the config file is read. 
+    """
+
     def __init__(self, name: str, *, required: bool = True):
         """
         Instantiate an option. You should create your option objects inside
         the constructor of a Section, inside your ``create()`` method.
-        ::
+        :
 
             def create(self):
                 Section(
@@ -407,7 +416,7 @@ class Option(ABC, Generic[T]):
         self.required = required
         # Create an empty value if the object or class doesn't already have one
         if not hasattr(self, 'value') and not hasattr(self.__class__, 'value'):
-            self.value: T = self.__empty__[1]
+            self.value = self.__empty__[1]
 
     def on_set(self, value: T):
         """
@@ -416,7 +425,6 @@ class Option(ABC, Generic[T]):
         to the new value. You can override this method to use custom behavior.
 
         The following are all equivalent:
-        ::
 
             my_config.set('Section One', 'SomeOption', 3)
             my_config['Section One'].set('SomeOption', 3)
@@ -426,9 +434,9 @@ class Option(ABC, Generic[T]):
         :raises TypeError: if the type of value does not match the option's __type__
         """
         # Check value type
-        if self.__type__ is not None and not isinstance(value, self.__type__):
-            raise TypeError("{}/{} expected type '{}', got '{}'".format(
-                self.section.name, self.name, self.__type__.__name__, type(value).__name__
+        if self.section and self.__type__ is not None and not isinstance(value, self.__type__):
+            raise TypeError("{}/{} expected type {}, got {}".format(
+                self.section.name, self.name, self.__type__, type(value)
             ))
 
         self.value = value
@@ -519,7 +527,6 @@ class UnlinkedOption(Option[T]):
     UnlinkedOptions do not need to implement ``to_str`` and ``from_str``. Instead,
     you can set ``self.value`` in the constructor or by overloading ``on_register()``,
     or you can implement ``self.value`` as a property. Examples:
-    ::
 
         class FortyTwoOption(UnlinkedOption):
             def __init__(self, name, *, required=False):
@@ -539,11 +546,11 @@ class UnlinkedOption(Option[T]):
     """
     __empty__ = (), None
 
-    def to_str(self, value: T) -> str:
-        pass
+    def to_str(self, value: T) -> Never:
+        raise NotImplementedError("Cannot call to_str() on UnlinkedOption")
 
-    def from_str(self, string: str) -> T:
-        pass
+    def from_str(self, string: str) -> Never:
+        raise NotImplementedError("Cannot call from_str() on UnlinkedOption")
 
     def parse(self, parser: ConfigParser, section_name: str):
         pass
@@ -552,7 +559,7 @@ class UnlinkedOption(Option[T]):
 class SectionCollection:
     """ See ``SectionCollection.__init__()`` """
 
-    def __init__(self, cfg: ConfigFile, *options: Option):
+    def __init__(self, cfg: ConfigFile, *options: Option[Any]):
         """
         A collection of sections. A SectionCollection will read all the sections in
         the config file, and create a Section for each one. It takes as parameters all
@@ -567,7 +574,6 @@ class SectionCollection:
         included in the SectionCollection, define those first in your ``create()`` method.
 
         Example:
-        ::
 
             [SecOne]
             Name = Alice
