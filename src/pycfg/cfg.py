@@ -361,7 +361,32 @@ class Section:
 T = TypeVar('T')
 class Option(ABC, Generic[T]):
     """
-    Base class for Options.
+    Base class for Options. Subclass this to make a custom Option. Example:
+
+        class MyOption(Option[Foo]):
+            __type__ = Foo
+
+            def from_str(self, string: str) -> Foo:
+                return Foo(string)
+            
+            def to_str(self, value: Foo) -> str:
+                return str(value)
+    
+    ``from_str()`` and ``to_str()`` must be implemented when making custom options.
+    The generic type parameter ``T`` in ``Option[T]`` defines the type of the option
+    value. This is the type that your ``from_str()`` function should return.
+
+    For advanced logic, it may be useful to return the Option object itself when
+    accessing the value of the option. In this case, return ``self`` in ``from_str()``.
+    Example:
+
+        class MyOption(Option['MyOption']):
+            def from_str(self, string: str) -> 'MyOption':
+                self.whatever = ...
+                return self
+            
+            def to_str(self, _) -> str:
+                return f"MyOption {self.whatever}"
     """
 
     __type__: Union[type, Tuple[type, ...], None] = None
