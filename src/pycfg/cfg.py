@@ -123,6 +123,8 @@ class ConfigFile:
         :param section: Section, or name of the section the option is in
         :param option: The option, or name of the option to change
         :param value: New value to set the option to
+        :raise TypeError: If the new value type does not match the option's ``__set_type__`` (and
+            type checking is enabled)
         """
         if self.__readonly__:
             raise PermissionError("Config file '%s' is read-only." % self.filename)
@@ -286,6 +288,8 @@ class Section:
 
         :param option: The option, or name of the option to change
         :param value: New value to set the option to
+        :raise TypeError: If the new value type does not match the option's ``__set_type__`` (and
+            type checking is enabled)
         """
         self.cfg.set(self, option, value)
 
@@ -364,7 +368,7 @@ class Option(ABC, Generic[T]):
     Base class for Options. Subclass this to make a custom Option. Example:
 
         class MyOption(Option[Foo]):
-            __type__ = Foo
+            __set_type__ = Foo
 
             def from_str(self, string: str) -> Foo:
                 return Foo(string)
@@ -389,11 +393,14 @@ class Option(ABC, Generic[T]):
                 return f"MyOption {self.whatever}"
     """
 
-    __type__: Union[type, Tuple[type, ...], None] = None
+    __set_type__: Union[type, Tuple[type, ...], None] = None
     """
-    Type to check the option's value against when setting a new value. Set it to
-    None to skip type checks. This is used with an ``isinstance()`` call, so you
-    should avoid using types from ``typing``.
+    Type to check the new value against when setting the option's value. A ``TypeError``
+    will be raised if the new value's type does not match ``__set_type__``. Set it to
+    ``None`` to skip these type checks.
+    
+    This is used with an ``isinstance()`` call, so avoid using ``typing`` module types.
+    Use a tuple to allow multiple types.
     """
 
     __empty__: Tuple[Tuple[str, ...], Optional[T]] = (('', 'none', 'null'), None)
@@ -446,7 +453,7 @@ class Option(ABC, Generic[T]):
     def on_set(self, value: Any):
         """
         Callback function for when the value of this option is set. Default behavior
-        is to check the type of the passed in value using __type__, and set ``self.value``
+        is to check the type of the passed in value using __set_type__, and set ``self.value``
         to the new value. You can override this method to use custom behavior.
 
         The following are all equivalent:
@@ -456,12 +463,12 @@ class Option(ABC, Generic[T]):
             my_config['Section One']['SomeOption'] = 3
 
         :param value: New value to set the option to
-        :raises TypeError: if the type of value does not match the option's __type__
+        :raises TypeError: if the type of value does not match the option's __set_type__
         """
         # Check value type
-        if self.section and self.__type__ is not None and not isinstance(value, self.__type__):
+        if self.section and self.__set_type__ is not None and not isinstance(value, self.__set_type__):
             raise TypeError("{}/{} expected type {}, got {}".format(
-                self.section.name, self.name, self.__type__, type(value)
+                self.section.name, self.name, self.__set_type__, type(value)
             ))
 
         self.value = value

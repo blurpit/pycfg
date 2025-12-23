@@ -141,7 +141,7 @@ def test_set_type_check():
             return f"Foo({self.val})"
 
     class FooOption(Option[Foo]):
-        __type__ = Foo
+        __set_type__ = Foo
 
         def to_str(self, value: Foo) -> str:
             return str(value)

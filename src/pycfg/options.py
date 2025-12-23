@@ -3,7 +3,6 @@ import json
 import pickle
 from datetime import date, datetime
 from decimal import Decimal
-from types import NoneType
 from typing import Any, Callable, Dict, Iterable, List, Never, Optional, Tuple, Union
 
 from .cfg import Option, Section, T, UnlinkedOption
@@ -11,7 +10,7 @@ from .cfg import Option, Section, T, UnlinkedOption
 
 class StrOption(Option[str]):
     """ Option for strings """
-    __type__ = str
+    __set_type__ = str
 
     def from_str(self, string: str) -> str:
         return string
@@ -21,7 +20,7 @@ class StrOption(Option[str]):
 
 class IntOption(Option[int]):
     """ Option for integers """
-    __type__ = int
+    __set_type__ = int
     __empty__ = ('',), 0
 
     def from_str(self, string: str) -> int:
@@ -32,7 +31,7 @@ class IntOption(Option[int]):
 
 class FloatOption(Option[float]):
     """ Option for floats """
-    __type__ = float
+    __set_type__ = float
     __empty__ = ('',), 0.0
 
     def from_str(self, string: str) -> float:
@@ -43,7 +42,7 @@ class FloatOption(Option[float]):
 
 class DecimalOption(Option[Decimal]):
     """ Option for decimal.Decimal """
-    __type__ = Decimal
+    __set_type__ = Decimal
 
     def from_str(self, string: str) -> Decimal:
         return Decimal(string)
@@ -53,7 +52,7 @@ class DecimalOption(Option[Decimal]):
 
 class BoolOption(Option[bool]):
     """ Option for booleans """
-    __type__ = bool
+    __set_type__ = bool
     __empty__ = ('',), False
     __truthy__ = ('true', 'yes', 'on', 'enabled')
     """ Text values that are considered truthy. """
@@ -65,7 +64,7 @@ class BoolOption(Option[bool]):
         return str(value)
 
 class ListOption(Option[List[T]]):
-    __type__ = list
+    __set_type__ = list
     __empty__ = (), None
 
     def __init__(
@@ -104,7 +103,7 @@ class ListOption(Option[List[T]]):
         return self.delimiter.join(map(str, value))
 
 class RangeOption(Option[range]):
-    __type__ = range
+    __set_type__ = range
 
     def __init__(self, name: str, delimiter: str = '-', *, required: bool = True):
         """
@@ -127,7 +126,7 @@ class RangeOption(Option[range]):
         return str(value.start) + self.delimiter + str(value.stop)
 
 class DateTimeOption(Option[datetime]):
-    __type__ = datetime
+    __set_type__ = datetime
 
     def __init__(self, name: str, fmt: Optional[str] = None, *, required: bool = True):
         """
@@ -152,7 +151,7 @@ class DateTimeOption(Option[datetime]):
             return value.strftime(self.fmt)
 
 class DateOption(Option[date]):
-    __type__ = date
+    __set_type__ = date
 
     def __init__(self, name: str, fmt: Optional[str] = None, *, required: bool = True):
         """
@@ -181,7 +180,7 @@ class PickleOption(Option[T]):
     Option for arbitrary Python objects. When writing to the config file,
     the object will be pickled and encoded as base64 text.
     """
-    __type__ = None
+    __set_type__ = None
 
     def from_str(self, string: str) -> T:
         encoding = self.section.cfg.encoding
@@ -201,7 +200,7 @@ class DictOption(Option[Dict[str, Any]]):
     will be JSON stringified. Therefore the dictionary must be JSON serializable.
     If it isn't, you can use PickleOption instead.
     """
-    __type__ = dict
+    __set_type__ = dict
     __empty__ = (), None
 
     def from_str(self, string: str) -> Dict[str, Any]:
