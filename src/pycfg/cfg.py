@@ -18,8 +18,13 @@ class ConfigFile:
             def create(self):
                 Section(
                     self, 'Section One',
-                    ...
+                    StrOption('String'),
+                    IntOption('Integer'),
+                    # ...
                 )
+        
+        cfg = MyConfig('my_file.cfg')
+        print( cfg['Section One']['Integer'] )
     """
 
     __readonly__ = False
@@ -136,6 +141,12 @@ class ConfigFile:
         # Convert str -> Option and make sure it is in the section
         if isinstance(option, str):
             option = section.get_ref(option)
+
+        # Check value type
+        if section and option.__set_type__ is not None and not isinstance(value, option.__set_type__):
+            raise TypeError("{}/{} expected type {}, got {}".format(
+                section.name, option.name, option.__set_type__, type(value)
+            ))
 
         # Set option value
         option.on_set(value)
@@ -378,19 +389,25 @@ class Option(ABC, Generic[T]):
     
     ``from_str()`` and ``to_str()`` must be implemented when making custom options.
     The generic type parameter ``T`` in ``Option[T]`` defines the type of the option
-    value. This is the type that your ``from_str()`` function should return.
+    value. This is the type that your ``from_str()`` function should return. ``__set_type``
+    is the type the option expects when setting a new value.
 
     For advanced logic, it may be useful to return the Option object itself when
-    accessing the value of the option. In this case, return ``self`` in ``from_str()``.
-    Example:
+    accessing the value of the option. In this case, return ``self`` in ``from_str()``,
+    and override ``on_set()``. Example:
 
         class MyOption(Option['MyOption']):
+            __set_type__ = str
+
             def from_str(self, string: str) -> 'MyOption':
                 self.whatever = ...
                 return self
             
             def to_str(self, _) -> str:
                 return f"MyOption {self.whatever}"
+
+            def on_set(self, value: str):
+                self.whatever = value
     """
 
     __set_type__: Union[type, Tuple[type, ...], None] = None
@@ -398,6 +415,10 @@ class Option(ABC, Generic[T]):
     Type to check the new value against when setting the option's value. A ``TypeError``
     will be raised if the new value's type does not match ``__set_type__``. Set it to
     ``None`` to skip these type checks.
+    :
+    
+        my_cfg['Section']['ExampleInteger'] = 'hello'
+        # Raises TypeError
     
     This is used with an ``isinstance()`` call, so avoid using ``typing`` module types.
     Use a tuple to allow multiple types.
@@ -465,12 +486,6 @@ class Option(ABC, Generic[T]):
         :param value: New value to set the option to
         :raises TypeError: if the type of value does not match the option's __set_type__
         """
-        # Check value type
-        if self.section and self.__set_type__ is not None and not isinstance(value, self.__set_type__):
-            raise TypeError("{}/{} expected type {}, got {}".format(
-                self.section.name, self.name, self.__set_type__, type(value)
-            ))
-
         self.value = value
 
     @abstractmethod
