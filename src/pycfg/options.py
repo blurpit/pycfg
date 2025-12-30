@@ -41,7 +41,7 @@ class FloatOption(Option[float]):
         return str(value)
 
 class DecimalOption(Option[Decimal]):
-    """ Option for decimal.Decimal """
+    """ Option for `decimal.Decimal` """
     __set_type__ = Decimal
 
     def from_str(self, string: str) -> Decimal:
@@ -107,13 +107,11 @@ class RangeOption(Option[range]):
 
     def __init__(self, name: str, delimiter: str = '-', *, required: bool = True):
         """
-        Option for ranges of integers. The value is a standard python ``range()``.
+        Option for ranges of integers. The value is a standard python `range()`.
         Start is inclusive, stop is exclusive.
 
-        TODO: support non-ints, `step` parameter, and inclusive end
-
         :param delimiter: String that separates the start & stop when writing to the
-            config file. Default is ``-``, e.g. range(0, 10) will be written as "0-10".
+            config file. Default is `-`, e.g. range(0, 10) will be written as "0-10".
         """
         super().__init__(name, required=required)
         self.delimiter = delimiter
@@ -214,7 +212,7 @@ class DictOption(Option[Dict[str, Any]]):
 JsonOption = DictOption
 
 class DerivedOption(UnlinkedOption[T]):
-    """ See ``DerivedOption.__init__()`` """
+    """ See `DerivedOption.__init__()` """
     def __init__(self, name: str, value: Callable[..., T], references: List[Union[str, Tuple[str, str]]]):
         """
         A DerivedOption is an option that is calculated from the values of other options.
@@ -224,7 +222,7 @@ class DerivedOption(UnlinkedOption[T]):
         Each reference can be one of two formats:
 
             1. A tuple containing the section name of the referenced option, followed by
-               the option name, e.g. ``('MySection', 'MyOption')``
+               the option name, e.g. `('MySection', 'MyOption')`
             2. The name of the referenced option only, if the option is in the same section
                as the derived option.
 
@@ -233,35 +231,36 @@ class DerivedOption(UnlinkedOption[T]):
         option.
 
         Examples:
-        ::
 
-            def create(self):
-                Section(
-                    self, 'SecOne',
-                    IntOption('OptA')
+        ```
+        def create(self):
+            Section(
+                self, 'SecOne',
+                IntOption('OptA')
+            )
+            Section(
+                self, 'SecTwo',
+                IntOption('OptB'),
+                # Create a derived option referencing OptB
+                # in the same section.
+                DerivedOption(
+                    'TripleB',
+                    lambda b: 3*b,
+                    ['OptB']
+                ),
+                # Create a derived option referencing OptB
+                # as well as OptA from a different section
+                DerivedOption(
+                    'ABSum',
+                    lambda a, b: a+b,
+                    [('SecOne', 'OptA'), 'OptB']
                 )
-                Section(
-                    self, 'SecTwo',
-                    IntOption('OptB'),
-                    # Create a derived option referencing OptB
-                    # in the same section.
-                    DerivedOption(
-                        'TripleB',
-                        lambda b: 3*b,
-                        ['OptB']
-                    ),
-                    # Create a derived option referencing OptB
-                    # as well as OptA from a different section
-                    DerivedOption(
-                        'ABSum',
-                        lambda a, b: a+b,
-                        [('SecOne', 'OptA'), 'OptB']
-                    )
-                )
+            )
+        ```
 
         You can access the values of the derived options the same as any other option.
-        In the above example, with ``my_cfg['SecTwo']['TripleB']`` and
-        ``my_cfg['SecTwo']['ABSum']``.
+        In the above example, with `my_cfg['SecTwo']['TripleB']` and
+        `my_cfg['SecTwo']['ABSum']`.
 
         The value function is called every time the option is accessed.
 
@@ -298,7 +297,7 @@ class DerivedOption(UnlinkedOption[T]):
             yield section[opt_name]
 
 class OptionCollection(UnlinkedOption[None]):
-    """ See ``OptionCollection.__init__()`` """
+    """ See `OptionCollection.__init__()` """
     def __init__(self, option_maker: Callable[[str], Option[Any]]):
         """
         A collection of options. An OptionCollection will read all options written under
@@ -316,29 +315,30 @@ class OptionCollection(UnlinkedOption[None]):
         OptionCollection when you define your Section.
 
         Example:
-        ::
 
-            [MySection]
-            A = 1
-            B = 2
-            C = 3
-            SomethingElse = Hello world
+        ```
+        [MySection]
+        A = 1
+        B = 2
+        C = 3
+        SomethingElse = Hello world
 
-            def create(self):
-                Section(
-                    self, 'MySection',
-                    StringOption('SomethingElse'),
-                    OptionCollection(
-                        lambda name: IntOption(name)
-                    )
+        def create(self):
+            Section(
+                self, 'MySection',
+                StringOption('SomethingElse'),
+                OptionCollection(
+                    lambda name: IntOption(name)
                 )
+            )
+        ```
 
-        In this example, the ``MySection`` section will have 3 IntOptions named
-        ``A``, ``B``, and ``C``, and a StringOption named ``SomethingElse``.
+        In this example, the `MySection` section will have 3 IntOptions named
+        `A`, `B`, and `C`, and a StringOption named `SomethingElse`.
 
         For simple option types, the constructor already acts as a (str) -> Option
         function, so you can simply pass in the option class itself. In the above
-        example, this would look like ``OptionCollection(IntOption)``, with no need
+        example, this would look like `OptionCollection(IntOption)`, with no need
         for the lambda.
 
         :param option_maker: Function that creates an Option given the option name

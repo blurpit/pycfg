@@ -11,32 +11,33 @@ from typing import Any, Dict, Generic, Iterable, List, Never, Optional, Tuple, T
 class ConfigFile:
     """
     The base class for python config files. Create a class that inherits from ConfigFile
-    and override the ``create()`` method to make your config file definition.
-    :
+    and override the `create()` method to make your config file definition.
 
-        class MyConfig(ConfigFile):
-            def create(self):
-                Section(
-                    self, 'Section One',
-                    StrOption('String'),
-                    IntOption('Integer'),
-                    # ...
-                )
-        
-        cfg = MyConfig('my_file.cfg')
-        print( cfg['Section One']['Integer'] )
+    ```
+    class MyConfig(ConfigFile):
+        def create(self):
+            Section(
+                self, 'Section One',
+                StrOption('String'),
+                IntOption('Integer'),
+                # ...
+            )
+    
+    cfg = MyConfig('my_file.cfg')
+    print( cfg['Section One']['Integer'] )
+    ```
     """
 
     __readonly__ = False
     """
-    Set ``__readonly__`` to True to prevent changing the values of any options, adding/removing
+    Set `__readonly__` to True to prevent changing the values of any options, adding/removing
     sections, or writing to the config file in any way.
     """
 
     def __init__(self, filename: Optional[str] = None, encoding: Optional[str] = None):
         """
         Instantiate your config object. If a filepath is given here, the file will be read. If a
-        filename isn't given in the constructor, you can read a file later using ``read()``.
+        filename isn't given in the constructor, you can read a file later using `read()`.
 
         :param filename: Path to the config file to read, or None.
         :param encoding: File encoding, or None.
@@ -121,14 +122,16 @@ class ConfigFile:
 
         The following are all equivalent:
 
-            my_config.set('Section One', 'SomeOption', 3)
-            my_config['Section One'].set('SomeOption', 3)
-            my_config['Section One']['SomeOption'] = 3
+        ```
+        my_config.set('Section One', 'SomeOption', 3)
+        my_config['Section One'].set('SomeOption', 3)
+        my_config['Section One']['SomeOption'] = 3
+        ```
 
         :param section: Section, or name of the section the option is in
         :param option: The option, or name of the option to change
         :param value: New value to set the option to
-        :raise TypeError: If the new value type does not match the option's ``__set_type__`` (and
+        :raise TypeError: If the new value type does not match the option's `__set_type__` (and
             type checking is enabled)
         """
         if self.__readonly__:
@@ -193,19 +196,20 @@ class ConfigFile:
     def create(self) -> None:
         """
         Override this method in a child class to define the structure of your config file.
-        For each section in your config, simply create a Section object inside ``create()``.
-        :
+        For each section in your config, simply create a Section object inside `create()`.
 
-            def create(self):
-                Section(
-                    self, 'Section One',
-                    ...
-                )
-                Section(
-                    self, 'Section Two',
-                    ...
-                )
+        ```
+        def create(self):
+            Section(
+                self, 'Section One',
                 ...
+            )
+            Section(
+                self, 'Section Two',
+                ...
+            )
+            ...
+        ```
         """
         raise NotImplementedError('ConfigFile classes need to implement the create() method')
 
@@ -222,7 +226,7 @@ class Section:
     def __init__(self, cfg: ConfigFile, name: str, *options: 'Option[Any]'):
         """
         Create a new section and attach it to a ConfigFile. Call this constructor inside
-        your ``create()`` method of your ConfigFile.
+        your `create()` method of your ConfigFile.
 
         :param cfg: ConfigFile to attach this section to
         :param name: Name of the section
@@ -271,12 +275,13 @@ class Section:
     def get(self, option_name: str, default: Any = None) -> Any:
         """
         Get the value of an option if it exists, otherwise return the given default.
-        Similar to ``dict.get()``.
-        :
+        Similar to `dict.get()`.
 
-            my_config['MySection'].get('MyOption', -1) # returns the value of MyOption
-            my_config['MySection'].get('BogusOption', -1) # returns -1
-
+        ```
+        my_config['MySection'].get('MyOption', -1) # returns the value of MyOption
+        my_config['MySection'].get('BogusOption', -1) # returns -1
+        ```
+        
         :param option_name: Name of the option to get
         :param default: Default value to return if the option doesn't exist. If not
             given, the default will be None.
@@ -293,13 +298,15 @@ class Section:
 
         The following are all equivalent:
 
-            my_config.set('Section One', 'SomeOption', 3)
-            my_config['Section One'].set('SomeOption', 3)
-            my_config['Section One']['SomeOption'] = 3
-
+        ```
+        my_config.set('Section One', 'SomeOption', 3)
+        my_config['Section One'].set('SomeOption', 3)
+        my_config['Section One']['SomeOption'] = 3
+        ```
+        
         :param option: The option, or name of the option to change
         :param value: New value to set the option to
-        :raise TypeError: If the new value type does not match the option's ``__set_type__`` (and
+        :raise TypeError: If the new value type does not match the option's `__set_type__` (and
             type checking is enabled)
         """
         self.cfg.set(self, option, value)
@@ -378,49 +385,54 @@ class Option(ABC, Generic[T]):
     """
     Base class for Options. Subclass this to make a custom Option. Example:
 
-        class MyOption(Option[Foo]):
-            __set_type__ = Foo
+    ```
+    class MyOption(Option[Foo]):
+        __set_type__ = Foo
 
-            def from_str(self, string: str) -> Foo:
-                return Foo(string)
-            
-            def to_str(self, value: Foo) -> str:
-                return str(value)
+        def from_str(self, string: str) -> Foo:
+            return Foo(string)
+        
+        def to_str(self, value: Foo) -> str:
+            return str(value)
+    ```
     
-    ``from_str()`` and ``to_str()`` must be implemented when making custom options.
-    The generic type parameter ``T`` in ``Option[T]`` defines the type of the option
-    value. This is the type that your ``from_str()`` function should return. ``__set_type``
+    `from_str()` and `to_str()` must be implemented when making custom options.
+    The generic type parameter `T` in `Option[T]` defines the type of the option
+    value. This is the type that your `from_str()` function should return. `__set_type`
     is the type the option expects when setting a new value.
 
     For advanced logic, it may be useful to return the Option object itself when
-    accessing the value of the option. In this case, return ``self`` in ``from_str()``,
-    and override ``on_set()``. Example:
+    accessing the value of the option. In this case, return `self` in `from_str()`,
+    and override `on_set()`. Example:
 
-        class MyOption(Option['MyOption']):
-            __set_type__ = str
+    ```
+    class MyOption(Option['MyOption']):
+        __set_type__ = str
 
-            def from_str(self, string: str) -> 'MyOption':
-                self.whatever = ...
-                return self
-            
-            def to_str(self, _) -> str:
-                return f"MyOption {self.whatever}"
+        def from_str(self, string: str) -> 'MyOption':
+            self.whatever = ...
+            return self
+        
+        def to_str(self, _) -> str:
+            return f"MyOption {self.whatever}"
 
-            def on_set(self, value: str):
-                self.whatever = value
+        def on_set(self, value: str):
+            self.whatever = value
+    ```
     """
 
     __set_type__: Union[type, Tuple[type, ...], None] = None
     """
-    Type to check the new value against when setting the option's value. A ``TypeError``
-    will be raised if the new value's type does not match ``__set_type__``. Set it to
-    ``None`` to skip these type checks.
-    :
+    Type to check the new value against when setting the option's value. A `TypeError`
+    will be raised if the new value's type does not match `__set_type__`. Set it to
+    `None` to skip these type checks.
     
-        my_cfg['Section']['ExampleInteger'] = 'hello'
-        # Raises TypeError
-    
-    This is used with an ``isinstance()`` call, so avoid using ``typing`` module types.
+    ```
+    my_cfg['Section']['ExampleInteger'] = 'hello'
+    # Raises TypeError
+    ```
+
+    This is used with an `isinstance()` call, so avoid using `typing` module types.
     Use a tuple to allow multiple types.
     """
 
@@ -429,40 +441,41 @@ class Option(ABC, Generic[T]):
     Defines the values that count as empty. The first element should be a tuple
     of all the strings in a config file that should be interpreted as empty (these
     are case insensitive). The second element is the empty value, for example 
-    ``None``, ``0``, ``()``, etc. The empty value should be either None or a falsey
+    `None`, `0`, `()`, etc. The empty value should be either None or a falsey
     value of whatever type the option value is.
 
     Because __empty__ is defined at the class level, the same empty value will be 
     returned for every instance of the Option. As such, you should avoid using
-    mutable objects as your empty value. Instead, set ``__empty__ = (), None`` and
-    implement a falsey check in ``from_str()``.
+    mutable objects as your empty value. Instead, set `__empty__ = (), None` and
+    implement a falsey check in `from_str()`.
     """
 
     value: Optional[T]
     """
     Stores the value for the option.
 
-    ``value`` will be ``None`` before the config file is read. 
+    `value` will be `None` before the config file is read. 
     """
 
     def __init__(self, name: str, *, required: bool = True):
         """
         Instantiate an option. You should create your option objects inside
-        the constructor of a Section, inside your ``create()`` method.
-        :
+        the constructor of a Section, inside your `create()` method.
 
-            def create(self):
-                Section(
-                    self, 'My Section',
-                    StringOption('Hello'),
-                    ...
-                )
-
+        ```
+        def create(self):
+            Section(
+                self, 'My Section',
+                StringOption('Hello'),
+                ...
+            )
+        ```
+            
         :param name: Name of the option
         :param required: Required options need to be present in the config file
             or a NoOptionError will be raised. If an option is not required, it
             can be missing from the config file, in which case its value will be
-            the empty value defined by ``__empty__``
+            the empty value defined by `__empty__`
         """
         self.name = name
         self.section: Optional[Section] = None
@@ -474,15 +487,17 @@ class Option(ABC, Generic[T]):
     def on_set(self, value: Any):
         """
         Callback function for when the value of this option is set. Default behavior
-        is to check the type of the passed in value using __set_type__, and set ``self.value``
+        is to check the type of the passed in value using __set_type__, and set `self.value`
         to the new value. You can override this method to use custom behavior.
 
         The following are all equivalent:
 
-            my_config.set('Section One', 'SomeOption', 3)
-            my_config['Section One'].set('SomeOption', 3)
-            my_config['Section One']['SomeOption'] = 3
-
+        ```
+        my_config.set('Section One', 'SomeOption', 3)
+        my_config['Section One'].set('SomeOption', 3)
+        my_config['Section One']['SomeOption'] = 3
+        ```
+        
         :param value: New value to set the option to
         :raises TypeError: if the type of value does not match the option's __set_type__
         """
@@ -498,7 +513,7 @@ class Option(ABC, Generic[T]):
         For example, an IntOption would convert the given string into an int.
 
         Some options may want to use the Option object itself as the value for more
-        complex behavior. In that case, you can simply return ``self``.
+        complex behavior. In that case, you can simply return `self`.
 
         This function is called when the config file is read.
 
@@ -514,7 +529,7 @@ class Option(ABC, Generic[T]):
         into the config file.
 
         This function is called when the value of the option is changed. The parameter
-        ``value`` is the same as ``self.value``.
+        `value` is the same as `self.value`.
 
         :param value: Python representation of the option value
         :return: Text representation of the option value
@@ -571,25 +586,27 @@ class UnlinkedOption(Option[T]):
     An UnlinkedOption is an option that exists only in the ConfigFile object in
     Python, and is not actually written in the config file.
 
-    UnlinkedOptions do not need to implement ``to_str`` and ``from_str``. Instead,
-    you can set ``self.value`` in the constructor or by overloading ``on_register()``,
-    or you can implement ``self.value`` as a property. Examples:
+    UnlinkedOptions do not need to implement `to_str` and `from_str`. Instead,
+    you can set `self.value` in the constructor or by overloading `on_register()`,
+    or you can implement `self.value` as a property. Examples:
 
-        class FortyTwoOption(UnlinkedOption):
-            def __init__(self, name, *, required=False):
-                super().__init__(name, required=required)
-                self.value = 42
+    ```
+    class FortyTwoOption(UnlinkedOption):
+        def __init__(self, name, *, required=False):
+            super().__init__(name, required=required)
+            self.value = 42
 
-        # always returns 42
-        my_config['MySection']['MyFortyTwo']
+    # always returns 42
+    my_config['MySection']['MyFortyTwo']
 
-        class RandomOption(UnlinkedOption):
-            @property
-            def value(self):
-                return random.random()
+    class RandomOption(UnlinkedOption):
+        @property
+        def value(self):
+            return random.random()
 
-        # returns a different random number every time
-        my_config['MySection']['MyRandom']
+    # returns a different random number every time
+    my_config['MySection']['MyRandom']
+    ```
     """
     __empty__ = (), None
 
@@ -604,7 +621,7 @@ class UnlinkedOption(Option[T]):
 
 
 class SectionCollection:
-    """ See ``SectionCollection.__init__()`` """
+    """ See `SectionCollection.__init__()` """
 
     def __init__(self, cfg: ConfigFile, *options: Option[Any]):
         """
@@ -618,27 +635,29 @@ class SectionCollection:
 
         The SectionCollection will consume all sections that aren't already defined in
         the ConfigFile. So, if you have other sections in the config that you don't want
-        included in the SectionCollection, define those first in your ``create()`` method.
+        included in the SectionCollection, define those first in your `create()` method.
 
         Example:
 
-            [SecOne]
-            Name = Alice
+        ```
+        [SecOne]
+        Name = Alice
 
-            [SecTwo]
-            Name = Bob
+        [SecTwo]
+        Name = Bob
 
-            [SecThree]
-            Name = Charlie
+        [SecThree]
+        Name = Charlie
 
-            def create(self):
-                SectionCollection(
-                    self,
-                    StrOption('Name')
-                )
+        def create(self):
+            SectionCollection(
+                self,
+                StrOption('Name')
+            )
+        ```
 
-        In this example, the config will have three sections in it: ``SecOne``, ``SecTwo``,
-        and ``SecThree``. Each section will have a StringOption called ``Name``.
+        In this example, the config will have three sections in it: `SecOne`, `SecTwo`,
+        and `SecThree`. Each section will have a StringOption called `Name`.
 
         :param cfg: ConfigFile to attach all the Sections to
         :param options: Options to create for each Section
