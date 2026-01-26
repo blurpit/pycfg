@@ -3,7 +3,7 @@ import json
 import pickle
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Callable, Dict, Iterable, List, Never, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 from .cfg import Option, Section, T, UnlinkedOption
 
@@ -281,7 +281,7 @@ class DerivedOption(UnlinkedOption[T]):
             else:
                 self.references.append(ref)
 
-    def on_set(self, value: Never) -> Never:
+    def on_set(self, value: Any) -> Any:
         raise ValueError('Cannot set value on a DerivedOption')
 
     @property

@@ -3,4 +3,4 @@ authors = [{name = "David Schneider", email = "davidschneider821@gmail.com"}]
 description = "A package for defining config file structure in python, converting types, and validating config values"
 name = "pycfg"
 requires-python = ">=3.7"
-version = "1.2.1"
+version = "1.2.2"

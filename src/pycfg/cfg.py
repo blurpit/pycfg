@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, \
     NoSectionError
 from copy import copy
-from typing import Any, Dict, Generic, Iterable, List, Never, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, Iterable, List, Optional, Tuple, TypeVar, Union
 
 
 class ConfigFile:
@@ -610,10 +610,10 @@ class UnlinkedOption(Option[T]):
     """
     __empty__ = (), None
 
-    def to_str(self, value: T) -> Never:
+    def to_str(self, value: T) -> Any:
         raise NotImplementedError("Cannot call to_str() on UnlinkedOption")
 
-    def from_str(self, string: str) -> Never:
+    def from_str(self, string: str) -> Any:
         raise NotImplementedError("Cannot call from_str() on UnlinkedOption")
 
     def parse(self, parser: ConfigParser, section_name: str):
