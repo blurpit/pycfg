@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import codecs
 from abc import ABC, abstractmethod
 from configparser import ConfigParser, DuplicateOptionError, DuplicateSectionError, NoOptionError, \
     NoSectionError
@@ -70,7 +69,7 @@ class ConfigFile:
             raise FileNotFoundError('No file was given.')
 
         # Open file
-        self.file = codecs.open(
+        self.file = open(
             self.filename,
             mode='r' if self.__readonly__ else 'r+',
             encoding=self.encoding
