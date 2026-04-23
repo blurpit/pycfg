@@ -85,7 +85,7 @@ class ConfigFile:
         # Call create() to register all sections, then parse them all
         self._sections = {}
         self.create()
-        for section in self:
+        for section in self._sections.values():
             section.parse(self.parser)
 
     def register_section(self, section: Section):
@@ -174,7 +174,7 @@ class ConfigFile:
 
     def __iter__(self):
         """ Iterates the Section objects in this config """
-        return iter(self._sections.values())
+        return iter(self._sections)
 
     def __contains__(self, section: Union['Section', str]):
         """
