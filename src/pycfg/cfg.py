@@ -78,6 +78,7 @@ class ConfigFile:
 
         # Read the file using configparser, and close the file
         try:
+            self.parser.clear()
             self.parser.read_file(self.file)
         finally:
             self.file.close()
